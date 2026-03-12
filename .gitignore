@@ -1,0 +1,34 @@
+# Binaries
+vau
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go coverage
+*.out
+coverage.html
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Goreleaser
+dist/
+
+# TODO (local)
+TODO.md

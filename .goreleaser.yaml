@@ -1,0 +1,103 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser v2 configuration for the "vau" CLI tool.
+# Docs: https://goreleaser.com
+version: 2
+
+builds:
+  - id: vau
+    binary: vau
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: darwin
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+nfpms:
+  - id: vau
+    package_name: vau
+    vendor: janosmiko
+    homepage: "https://github.com/janosmiko/vau"
+    maintainer: "janosmiko <janosmiko@users.noreply.github.com>"
+    description: "A yazi-inspired terminal UI for browsing and editing HashiCorp Vault KV secrets"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+dockers:
+  - image_templates:
+      - "janosmiko/vau:{{ .Tag }}-amd64"
+      - "janosmiko/vau:latest-amd64"
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    goarch: amd64
+  - image_templates:
+      - "janosmiko/vau:{{ .Tag }}-arm64"
+      - "janosmiko/vau:latest-arm64"
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "janosmiko/vau:{{ .Tag }}"
+    image_templates:
+      - "janosmiko/vau:{{ .Tag }}-amd64"
+      - "janosmiko/vau:{{ .Tag }}-arm64"
+  - name_template: "janosmiko/vau:latest"
+    image_templates:
+      - "janosmiko/vau:latest-amd64"
+      - "janosmiko/vau:latest-arm64"
+
+release:
+  github:
+    owner: janosmiko
+    name: vau
+
+brews:
+  - repository:
+      owner: janosmiko
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/janosmiko/vau"
+    description: "A terminal UI for browsing HashiCorp Vault"
+    license: "MIT"
+    install: |
+      bin.install "vau"
+    test: |
+      system "#{bin}/vau", "--version"
