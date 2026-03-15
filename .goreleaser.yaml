@@ -17,9 +17,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.ShortCommit}}
-      - -X main.date={{.Date}}
+      - -X github.com/janosmiko/vau/internal/version.Version={{.Version}}
+      - -X github.com/janosmiko/vau/internal/version.GitCommit={{.ShortCommit}}
+      - -X github.com/janosmiko/vau/internal/version.BuildDate={{.Date}}
 
 archives:
   - id: default
@@ -30,6 +30,9 @@ archives:
         formats:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
 
 nfpms:
   - id: vau
@@ -77,6 +80,7 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
+    name: vau
     homepage: "https://github.com/janosmiko/vau"
     description: "A terminal UI for browsing HashiCorp Vault"
     license: "MIT"

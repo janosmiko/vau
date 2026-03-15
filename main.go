@@ -9,13 +9,7 @@ import (
 	"github.com/janosmiko/vau/internal/config"
 	"github.com/janosmiko/vau/internal/ui"
 	"github.com/janosmiko/vau/internal/vault"
-)
-
-// Set via ldflags at build time by goreleaser.
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
+	"github.com/janosmiko/vau/internal/version"
 )
 
 const helpText = `vau - A yazi-inspired terminal UI for browsing and editing HashiCorp Vault KV secrets.
@@ -45,7 +39,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "--version", "-v":
-			fmt.Printf("vau %s (%s) built %s\n", version, commit, date)
+			fmt.Println(version.Full())
 			os.Exit(0)
 		case "--help", "-h":
 			fmt.Print(helpText)
@@ -74,7 +68,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	m := app.NewModel(client, cfg, version)
+	m := app.NewModel(client, cfg, version.Short())
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
