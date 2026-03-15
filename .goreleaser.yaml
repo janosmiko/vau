@@ -31,18 +31,6 @@ archives:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
-checksum:
-  name_template: "checksums.txt"
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^ci:"
-      - "^chore:"
-
 nfpms:
   - id: vau
     package_name: vau
@@ -83,11 +71,6 @@ docker_manifests:
       - "janosmiko/vau:latest-amd64"
       - "janosmiko/vau:latest-arm64"
 
-release:
-  github:
-    owner: janosmiko
-    name: vau
-
 brews:
   - repository:
       owner: janosmiko
@@ -101,3 +84,20 @@ brews:
       bin.install "vau"
     test: |
       system "#{bin}/vau", "--version"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: janosmiko
+    name: vau

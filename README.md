@@ -4,6 +4,8 @@ A yazi-inspired terminal UI for browsing and editing HashiCorp Vault KV secrets.
 
 **vau** is a lightning-fast, keyboard-driven, yazi-inspired navigator for your Vault secrets. Supports both **KV v1** and **KV v2** engines with automatic version detection.
 
+![Demo](./docs/imgs/demo.gif)
+
 > **Disclaimer**: This project is largely vibe coded with AI assistance. While it works well for everyday Vault browsing and editing, please review the code and use it at your own risk. Contributions and bug reports are welcome!
 
 > **Disclaimer**: This project is not affiliated with, endorsed by, or associated with HashiCorp in any way.
