@@ -69,8 +69,10 @@ type (
 		secret *model.Secret
 	}
 	yankResultMsg struct {
-		secret *model.Secret
-		isCut  bool
+		secrets []*model.Secret
+		paths   []string
+		isCut   bool
+		isDir   bool
 	}
 )
 
@@ -156,11 +158,11 @@ type Model struct {
 	inputBuffer string // for multi-step inputs (e.g., new key then value)
 	textInput   textinput.Model
 
-	// Clipboard: stores yanked secret data (not just path)
-	yankedSecret *model.Secret
-	yankIsCut    bool   // true if yanked via cut (x) — paste will delete source
-	yankIsDir    bool   // true if yanked item is a directory
-	yankPath     string // path of yanked item (used for directory operations)
+	// Clipboard: stores yanked secret data for single or bulk operations
+	yankedSecrets []*model.Secret // yanked secrets (one or more)
+	yankPaths     []string        // paths of yanked items (for directory operations)
+	yankIsCut     bool            // true if yanked via cut (x) — paste will delete source
+	yankIsDir     bool            // true if yanked items include directories
 
 	// Search (s = jump-to) and Filter (/ = hide non-matching)
 	searchInput textinput.Model
@@ -344,12 +346,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case yankResultMsg:
-		m.yankedSecret = msg.secret
+		m.yankedSecrets = msg.secrets
+		m.yankPaths = msg.paths
+		m.yankIsCut = msg.isCut
+		m.yankIsDir = msg.isDir
 		m.errMsg = ""
-		if msg.isCut {
-			m.status = "Cut (yanked for move): " + msg.secret.Path
+		if len(msg.secrets) == 1 && !msg.isDir {
+			if msg.isCut {
+				m.status = "Cut (yanked for move): " + msg.secrets[0].Path
+			} else {
+				m.status = "Yanked: " + msg.secrets[0].Path
+			}
+		} else if msg.isDir && len(msg.paths) > 0 {
+			if msg.isCut {
+				m.status = fmt.Sprintf("Cut %d items for move", len(msg.paths))
+			} else {
+				m.status = fmt.Sprintf("Yanked %d items", len(msg.paths))
+			}
 		} else {
-			m.status = "Yanked: " + msg.secret.Path
+			count := len(msg.secrets)
+			if msg.isCut {
+				m.status = fmt.Sprintf("Cut %d secrets for move", count)
+			} else {
+				m.status = fmt.Sprintf("Yanked %d secrets", count)
+			}
 		}
 		return m, nil
 
@@ -1380,21 +1400,25 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case matchKey(key, m.keys.Yank):
-		// Yank: read the secret data and store it
+		if len(m.selected) > 0 {
+			entries := m.selectedEntries()
+			m.status = fmt.Sprintf("Yanking %d items...", len(entries))
+			m.selected = make(map[int]bool)
+			return m, m.bulkYankSecrets(entries, false)
+		}
 		entry := m.selectedEntry()
 		if entry != nil && !entry.IsDir {
 			path := m.currentPath() + entry.Name
 			m.yankIsCut = false
 			m.yankIsDir = false
-			m.yankPath = path
+			m.yankPaths = []string{path}
 			m.status = "Yanking " + entry.Name + "..."
 			return m, m.yankSecret(path)
 		}
 
 	case matchKey(key, m.keys.Paste):
-		// Paste: write yanked secret to current directory, or move directory
 		if m.yankIsDir && m.yankIsCut {
-			cmd := m.pasteSecret()
+			cmd := m.pasteSecrets()
 			m.yankIsCut = false
 			m.yankIsDir = false
 			return m, cmd
@@ -1403,9 +1427,9 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.errMsg = "Cannot yank-paste directories, use cut (x) instead"
 			return m, nil
 		}
-		if m.yankedSecret != nil {
-			cmd := m.pasteSecret()
-			m.yankIsCut = false // after cut-paste, subsequent pastes are copies
+		if len(m.yankedSecrets) > 0 {
+			cmd := m.pasteSecrets()
+			m.yankIsCut = false
 			return m, cmd
 		}
 		m.errMsg = "Nothing yanked"
@@ -1507,22 +1531,27 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case matchKey(key, m.keys.Cut):
-		// Cut: yank secret (or directory path), mark as cut (paste will move)
+		if len(m.selected) > 0 {
+			entries := m.selectedEntries()
+			m.status = fmt.Sprintf("Cutting %d items...", len(entries))
+			m.selected = make(map[int]bool)
+			return m, m.bulkYankSecrets(entries, true)
+		}
 		entry := m.selectedEntry()
 		if entry != nil {
 			if entry.IsDir {
 				path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
 				m.yankIsCut = true
 				m.yankIsDir = true
-				m.yankPath = path
-				m.yankedSecret = nil
+				m.yankPaths = []string{path}
+				m.yankedSecrets = nil
 				m.status = "Cut (directory): " + entry.Name
 				return m, nil
 			}
 			path := m.currentPath() + entry.Name
 			m.yankIsCut = true
 			m.yankIsDir = false
-			m.yankPath = path
+			m.yankPaths = []string{path}
 			m.status = "Cutting " + entry.Name + "..."
 			return m, m.yankSecret(path)
 		}
@@ -2969,7 +2998,30 @@ func (m *Model) yankSecret(path string) tea.Cmd {
 		if err != nil {
 			return errorMsg(fmt.Sprintf("yank failed: %v", err))
 		}
-		return yankResultMsg{secret: secret, isCut: isCut}
+		return yankResultMsg{secrets: []*model.Secret{secret}, paths: []string{path}, isCut: isCut}
+	}
+}
+
+func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
+	basePath := m.currentPath()
+	return func() tea.Msg {
+		var secrets []*model.Secret
+		var paths []string
+		hasDir := false
+		for _, entry := range entries {
+			path := basePath + strings.TrimSuffix(entry.Name, "/")
+			paths = append(paths, path)
+			if entry.IsDir {
+				hasDir = true
+				continue
+			}
+			secret, err := m.client.Read(basePath + entry.Name)
+			if err != nil {
+				return errorMsg(fmt.Sprintf("yank failed for %s: %v", entry.Name, err))
+			}
+			secrets = append(secrets, secret)
+		}
+		return yankResultMsg{secrets: secrets, paths: paths, isCut: isCut, isDir: hasDir}
 	}
 }
 
@@ -3087,83 +3139,99 @@ func (m *Model) createSecretWithEditor(path string) tea.Cmd {
 	}
 }
 
-func (m *Model) pasteSecret() tea.Cmd {
+func (m *Model) pasteSecrets() tea.Cmd {
 	isCut := m.yankIsCut
 	isDir := m.yankIsDir
-	yankPath := m.yankPath
-	yanked := m.yankedSecret
+	yankPaths := make([]string, len(m.yankPaths))
+	copy(yankPaths, m.yankPaths)
+	yankedSecrets := make([]*model.Secret, len(m.yankedSecrets))
+	copy(yankedSecrets, m.yankedSecrets)
+	basePath := m.currentPath()
+
 	return func() tea.Msg {
-		// Directory cut+paste: use MoveRecursive
-		if isDir && isCut {
-			parts := strings.Split(strings.TrimSuffix(yankPath, "/"), "/")
-			name := parts[len(parts)-1]
-			dst := m.currentPath() + name
-			count, err := m.client.MoveRecursive(yankPath, dst)
-			if err != nil {
-				return errorMsg(err.Error())
+		// Directory cut+paste: use MoveRecursive for each directory
+		if isDir && isCut && len(yankPaths) > 0 {
+			totalMoved := 0
+			for _, yp := range yankPaths {
+				parts := strings.Split(strings.TrimSuffix(yp, "/"), "/")
+				name := parts[len(parts)-1]
+				dst := basePath + name
+				count, err := m.client.MoveRecursive(yp, dst)
+				if err != nil {
+					return errorMsg(fmt.Sprintf("moved %d items, then error: %v", totalMoved, err))
+				}
+				totalMoved += count
 			}
-			return undoableStatusMsg{
-				status: fmt.Sprintf("Moved directory %s → %s (%d secrets)", yankPath, dst, count),
-				undo: model.UndoAction{
-					Type:        model.UndoCutPaste,
-					Description: fmt.Sprintf("move dir %s → %s", yankPath, dst),
-					Path:        dst,
-					OldPath:     yankPath,
-				},
-			}
+			return statusMsg(fmt.Sprintf("Moved %d items", totalMoved))
 		}
 
-		if yanked == nil {
+		if len(yankedSecrets) == 0 {
 			return errorMsg("nothing yanked")
 		}
-		// Extract name from yanked path
-		parts := strings.Split(strings.TrimSuffix(yanked.Path, "/"), "/")
-		name := parts[len(parts)-1]
-		dst := m.currentPath() + name
 
-		// If destination exists, append _1, _2, etc.
-		if _, err := m.client.Read(dst); err == nil {
-			for i := 1; ; i++ {
-				candidate := m.currentPath() + fmt.Sprintf("%s_%d", name, i)
-				if _, err := m.client.Read(candidate); err != nil {
-					dst = candidate
-					break
+		pastedCount := 0
+		for _, yanked := range yankedSecrets {
+			parts := strings.Split(strings.TrimSuffix(yanked.Path, "/"), "/")
+			name := parts[len(parts)-1]
+			dst := basePath + name
+
+			// If destination exists, append _1, _2, etc.
+			if _, err := m.client.Read(dst); err == nil {
+				for i := 1; ; i++ {
+					candidate := basePath + fmt.Sprintf("%s_%d", name, i)
+					if _, err := m.client.Read(candidate); err != nil {
+						dst = candidate
+						break
+					}
 				}
 			}
+
+			if err := m.client.Write(dst, yanked.Data); err != nil {
+				return errorMsg(fmt.Sprintf("pasted %d items, then error: %v", pastedCount, err))
+			}
+
+			if isCut {
+				if err := m.client.Delete(yanked.Path); err != nil {
+					return errorMsg(fmt.Sprintf("pasted to %s but failed to delete source: %v", dst, err))
+				}
+			}
+			pastedCount++
 		}
 
-		if err := m.client.Write(dst, yanked.Data); err != nil {
-			return errorMsg(err.Error())
-		}
-
-		if isCut {
-			// Cut+paste: also delete the source
-			if err := m.client.Delete(yanked.Path); err != nil {
-				return errorMsg(fmt.Sprintf("pasted to %s but failed to delete source: %v", dst, err))
+		if pastedCount == 1 {
+			yanked := yankedSecrets[0]
+			parts := strings.Split(strings.TrimSuffix(yanked.Path, "/"), "/")
+			name := parts[len(parts)-1]
+			dst := basePath + name
+			if isCut {
+				return undoableStatusMsg{
+					status: fmt.Sprintf("Moved %s → %s", yanked.Path, dst),
+					undo: model.UndoAction{
+						Type:        model.UndoCutPaste,
+						Description: fmt.Sprintf("move %s → %s", yanked.Path, dst),
+						Path:        dst,
+						OldPath:     yanked.Path,
+						Data:        copyMap(yanked.Data),
+						Keys:        copySlice(yanked.Keys),
+					},
+				}
 			}
 			return undoableStatusMsg{
-				status: fmt.Sprintf("Moved %s → %s", yanked.Path, dst),
+				status: fmt.Sprintf("Pasted %s → %s", yanked.Path, dst),
 				undo: model.UndoAction{
-					Type:        model.UndoCutPaste,
-					Description: fmt.Sprintf("move %s → %s", yanked.Path, dst),
+					Type:        model.UndoPasteSecret,
+					Description: "paste to " + dst,
 					Path:        dst,
-					OldPath:     yanked.Path,
 					Data:        copyMap(yanked.Data),
 					Keys:        copySlice(yanked.Keys),
 				},
 			}
 		}
 
-		return undoableStatusMsg{
-			status: fmt.Sprintf("Pasted %s → %s", yanked.Path, dst),
-			undo: model.UndoAction{
-				Type:        model.UndoPasteSecret,
-				Description: "paste to " + dst,
-				Path:        dst,
-				Data:        copyMap(yanked.Data),
-				Keys:        copySlice(yanked.Keys),
-			},
+		if isCut {
+			return statusMsg(fmt.Sprintf("Moved %d secrets", pastedCount))
 		}
+		return statusMsg(fmt.Sprintf("Pasted %d secrets", pastedCount))
 	}
 }
 
