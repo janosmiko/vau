@@ -332,11 +332,11 @@ var builtinThemes = map[string]config.ThemeConfig{
 
 // lightThemes lists themes that are light-background themes.
 var lightThemes = map[string]bool{
-	"tokyonight-light":  true,
-	"kanagawa-lotus":    true,
-	"gruvbox-light":     true,
-	"catppuccin-latte":  true,
-	"bluloco-light":     true,
+	"tokyonight-light": true,
+	"kanagawa-lotus":   true,
+	"gruvbox-light":    true,
+	"catppuccin-latte": true,
+	"bluloco-light":    true,
 }
 
 // ThemeEntry represents a single entry in the grouped theme list.
