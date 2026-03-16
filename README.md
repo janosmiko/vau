@@ -477,12 +477,18 @@ Contributions are welcome! Here's how to get started:
 
 ### Development Setup
 
-1. **Prerequisites**: Go 1.24+ and a running Vault instance
+1. **Prerequisites**: Go 1.26+ and a running Vault instance
 
 2. **Clone and build**:
+
    ```bash
    git clone https://github.com/janosmiko/vau.git
-   cd v
+   cd vau
+
+   # Set up git hooks and install dependencies
+   make setup
+   go mod download
+
    go build -o vau .
    ```
 
