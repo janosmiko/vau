@@ -114,6 +114,53 @@ func (c *Client) ListMounts() ([]string, error) {
 	return kvMounts, nil
 }
 
+// ListWithMount returns entries at the given path using the specified mount,
+// without modifying the client's active mount. Safe for concurrent use.
+func (c *Client) ListWithMount(mount, path string) ([]model.Entry, error) {
+	var apiPath string
+	if c.getMountVersion(mount) == 1 {
+		apiPath = fmt.Sprintf("%s/%s", mount, path)
+	} else {
+		apiPath = fmt.Sprintf("%s/metadata/%s", mount, path)
+	}
+	secret, err := c.raw.Logical().List(apiPath)
+	if err != nil {
+		return nil, fmt.Errorf("listing %s: %w", path, err)
+	}
+	if secret == nil || secret.Data == nil {
+		return nil, nil
+	}
+
+	keysRaw, ok := secret.Data["keys"]
+	if !ok {
+		return nil, nil
+	}
+
+	keysList, ok := keysRaw.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected keys type at %s", path)
+	}
+
+	entries := make([]model.Entry, 0, len(keysList))
+	for _, k := range keysList {
+		name := fmt.Sprintf("%v", k)
+		isDir := strings.HasSuffix(name, "/")
+		entries = append(entries, model.Entry{
+			Name:  name,
+			IsDir: isDir,
+		})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].IsDir != entries[j].IsDir {
+			return entries[i].IsDir
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	return entries, nil
+}
+
 // List returns entries at the given path within the KV engine.
 func (c *Client) List(path string) ([]model.Entry, error) {
 	var apiPath string

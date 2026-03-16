@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -173,13 +174,18 @@ func LoadBookmarks() ([]Bookmark, error) {
 			return nil, err
 		}
 
-		// Migrate: write to new state location, then remove old file.
+		// Migrate: write to new state location, verify, then remove old file.
 		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(path, data, 0o644); err != nil {
+		if err := os.WriteFile(path, data, 0o600); err != nil {
 			return nil, err
+		}
+		// Verify the written file matches before deleting the old one.
+		written, err := os.ReadFile(path)
+		if err != nil || len(written) != len(data) {
+			return nil, fmt.Errorf("bookmark migration verification failed")
 		}
 		_ = os.Remove(oldPath)
 	}
@@ -199,7 +205,7 @@ func SaveBookmarks(bookmarks []Bookmark) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
@@ -207,6 +213,6 @@ func SaveBookmarks(bookmarks []Bookmark) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 

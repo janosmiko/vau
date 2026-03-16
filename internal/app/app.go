@@ -68,6 +68,10 @@ type (
 	newSecretInlineMsg     struct {
 		secret *model.Secret
 	}
+	yankResultMsg struct {
+		secret *model.Secret
+		isCut  bool
+	}
 )
 
 // TabState holds per-tab navigation state.
@@ -336,6 +340,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errMsg = ""
 		if m.mode == model.ModeExplorer {
 			return m, m.refresh()
+		}
+		return m, nil
+
+	case yankResultMsg:
+		m.yankedSecret = msg.secret
+		m.errMsg = ""
+		if msg.isCut {
+			m.status = "Cut (yanked for move): " + msg.secret.Path
+		} else {
+			m.status = "Yanked: " + msg.secret.Path
 		}
 		return m, nil
 
@@ -2198,22 +2212,25 @@ func (m *Model) removeLastEmptyKey() []string {
 
 // renameKey handles renaming a key in the secret (delete old, add new with value).
 func (m *Model) renameKey(oldKey, newKey, val string) tea.Cmd {
-	return func() tea.Msg {
-		snapData := copyMap(m.secret.Data)
-		snapKeys := copySlice(m.secret.Keys)
-		secretPath := m.secret.Path
+	snapData := copyMap(m.secret.Data)
+	snapKeys := copySlice(m.secret.Keys)
+	secretPath := m.secret.Path
 
-		// Remove old key, add new key preserving position
-		delete(m.secret.Data, oldKey)
-		m.secret.Data[newKey] = val
-		for i, k := range m.secret.Keys {
-			if k == oldKey {
-				m.secret.Keys[i] = newKey
-				break
-			}
+	// Mutate model state synchronously (safe — called from Update goroutine).
+	delete(m.secret.Data, oldKey)
+	m.secret.Data[newKey] = val
+	for i, k := range m.secret.Keys {
+		if k == oldKey {
+			m.secret.Keys[i] = newKey
+			break
 		}
+	}
 
-		if err := m.client.Write(m.secret.Path, m.secret.Data); err != nil {
+	// Copy updated state for the async Vault write.
+	writeData := copyMap(m.secret.Data)
+
+	return func() tea.Msg {
+		if err := m.client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -2885,11 +2902,7 @@ func (m *Model) loadMountPreview() tea.Cmd {
 	}
 	mount := m.mounts[m.mountCursor]
 	return func() tea.Msg {
-		// Temporarily use this mount to list its root
-		origMount := m.client.Mount()
-		m.client.SetMount(mount)
-		entries, err := m.client.List("")
-		m.client.SetMount(origMount)
+		entries, err := m.client.ListWithMount(mount, "")
 		if err != nil {
 			return listResultMsg{path: "@@mount_preview@@", entries: nil, err: err}
 		}
@@ -2962,11 +2975,7 @@ func (m *Model) yankSecret(path string) tea.Cmd {
 		if err != nil {
 			return errorMsg(fmt.Sprintf("yank failed: %v", err))
 		}
-		m.yankedSecret = secret
-		if isCut {
-			return statusMsg("Cut (yanked for move): " + path)
-		}
-		return statusMsg("Yanked: " + path)
+		return yankResultMsg{secret: secret, isCut: isCut}
 	}
 }
 
@@ -3165,26 +3174,30 @@ func (m *Model) pasteSecret() tea.Cmd {
 }
 
 func (m *Model) deleteKey(key string) tea.Cmd {
+	// Snapshot before change
+	snapData := copyMap(m.secret.Data)
+	snapKeys := copySlice(m.secret.Keys)
+	secretPath := m.secret.Path
+
+	// Mutate model state synchronously (safe — called from Update goroutine).
+	delete(m.secret.Data, key)
+	newKeys := make([]string, 0, len(m.secret.Keys))
+	for _, k := range m.secret.Keys {
+		if k != key {
+			newKeys = append(newKeys, k)
+		}
+	}
+	m.secret.Keys = newKeys
+
+	if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
+		m.secretCursor--
+	}
+
+	// Copy updated state for the async Vault write.
+	writeData := copyMap(m.secret.Data)
+
 	return func() tea.Msg {
-		// Snapshot before change
-		snapData := copyMap(m.secret.Data)
-		snapKeys := copySlice(m.secret.Keys)
-		secretPath := m.secret.Path
-
-		delete(m.secret.Data, key)
-		newKeys := make([]string, 0, len(m.secret.Keys))
-		for _, k := range m.secret.Keys {
-			if k != key {
-				newKeys = append(newKeys, k)
-			}
-		}
-		m.secret.Keys = newKeys
-
-		if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
-			m.secretCursor--
-		}
-
-		if err := m.client.Write(m.secret.Path, m.secret.Data); err != nil {
+		if err := m.client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -3201,24 +3214,31 @@ func (m *Model) deleteKey(key string) tea.Cmd {
 }
 
 // editorCommand returns the editor to use, checking config, then $EDITOR,
-// then $VISUAL, and falling back to "vim".
-func (m *Model) editorCommand() string {
+// then $VISUAL, and falling back to "vim". It validates that the editor
+// binary exists in PATH before returning.
+func (m *Model) editorCommand() (string, error) {
+	editor := "vim"
 	if m.config != nil && m.config.Editor != "" {
-		return m.config.Editor
+		editor = m.config.Editor
+	} else if e := os.Getenv("EDITOR"); e != "" {
+		editor = e
+	} else if e := os.Getenv("VISUAL"); e != "" {
+		editor = e
 	}
-	if e := os.Getenv("EDITOR"); e != "" {
-		return e
+	if _, err := exec.LookPath(editor); err != nil {
+		return "", fmt.Errorf("editor %q not found in PATH", editor)
 	}
-	if e := os.Getenv("VISUAL"); e != "" {
-		return e
-	}
-	return "vim"
+	return editor, nil
 }
 
 func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
 	data := []byte("{\n  \n}")
 
-	tmpFile, err := os.CreateTemp("", "vault-secret-*.json")
+	tmpDir := os.Getenv("XDG_RUNTIME_DIR")
+	if tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
+	tmpFile, err := os.CreateTemp(tmpDir, ".vau-edit-*.json")
 	if err != nil {
 		return func() tea.Msg { return errorMsg("tmpfile: " + err.Error()) }
 	}
@@ -3227,8 +3247,13 @@ func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
 		return func() tea.Msg { return errorMsg("write: " + err.Error()) }
 	}
 	tmpFile.Close()
+	os.Chmod(tmpFile.Name(), 0o600)
 
-	editor := m.editorCommand()
+	editor, err := m.editorCommand()
+	if err != nil {
+		os.Remove(tmpFile.Name())
+		return func() tea.Msg { return errorMsg(err.Error()) }
+	}
 
 	c := exec.Command(editor, tmpFile.Name())
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -3249,15 +3274,19 @@ func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
 }
 
 func (m *Model) addKeyValue(key, val string) tea.Cmd {
+	snapData := copyMap(m.secret.Data)
+	snapKeys := copySlice(m.secret.Keys)
+	secretPath := m.secret.Path
+
+	// Mutate model state synchronously (safe — called from Update goroutine).
+	m.secret.Data[key] = val
+	m.secret.Keys = append(m.secret.Keys, key)
+
+	// Copy updated state for the async Vault write.
+	writeData := copyMap(m.secret.Data)
+
 	return func() tea.Msg {
-		snapData := copyMap(m.secret.Data)
-		snapKeys := copySlice(m.secret.Keys)
-		secretPath := m.secret.Path
-
-		m.secret.Data[key] = val
-		m.secret.Keys = append(m.secret.Keys, key)
-
-		if err := m.client.Write(m.secret.Path, m.secret.Data); err != nil {
+		if err := m.client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -3274,14 +3303,18 @@ func (m *Model) addKeyValue(key, val string) tea.Cmd {
 }
 
 func (m *Model) editValue(key, val string) tea.Cmd {
+	snapData := copyMap(m.secret.Data)
+	snapKeys := copySlice(m.secret.Keys)
+	secretPath := m.secret.Path
+
+	// Mutate model state synchronously (safe — called from Update goroutine).
+	m.secret.Data[key] = val
+
+	// Copy updated state for the async Vault write.
+	writeData := copyMap(m.secret.Data)
+
 	return func() tea.Msg {
-		snapData := copyMap(m.secret.Data)
-		snapKeys := copySlice(m.secret.Keys)
-		secretPath := m.secret.Path
-
-		m.secret.Data[key] = val
-
-		if err := m.client.Write(m.secret.Path, m.secret.Data); err != nil {
+		if err := m.client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -3304,7 +3337,11 @@ func (m *Model) editSecretInEditor() tea.Cmd {
 		return func() tea.Msg { return errorMsg("json: " + err.Error()) }
 	}
 
-	tmpFile, err := os.CreateTemp("", "vault-secret-*.json")
+	tmpDir := os.Getenv("XDG_RUNTIME_DIR")
+	if tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
+	tmpFile, err := os.CreateTemp(tmpDir, ".vau-edit-*.json")
 	if err != nil {
 		return func() tea.Msg { return errorMsg("tmpfile: " + err.Error()) }
 	}
@@ -3313,8 +3350,13 @@ func (m *Model) editSecretInEditor() tea.Cmd {
 		return func() tea.Msg { return errorMsg("write: " + err.Error()) }
 	}
 	tmpFile.Close()
+	os.Chmod(tmpFile.Name(), 0o600)
 
-	editor := m.editorCommand()
+	editor, err := m.editorCommand()
+	if err != nil {
+		os.Remove(tmpFile.Name())
+		return func() tea.Msg { return errorMsg(err.Error()) }
+	}
 
 	c := exec.Command(editor, tmpFile.Name())
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -3339,8 +3381,11 @@ func (m *Model) editSecretInEditor() tea.Cmd {
 
 // saveSecretFromEditor writes the editor-modified secret to Vault and returns an undoable status.
 func (m *Model) saveSecretFromEditor(secretPath string, snapData map[string]string, snapKeys []string) tea.Cmd {
+	// Copy updated state for the async Vault write (avoid reading m.secret in goroutine).
+	writeData := copyMap(m.secret.Data)
+
 	return func() tea.Msg {
-		if err := m.client.Write(m.secret.Path, m.secret.Data); err != nil {
+		if err := m.client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
