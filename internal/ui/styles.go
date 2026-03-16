@@ -105,20 +105,10 @@ var (
 	Base64ValueStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#bb9af7"))
 
-	// Confirm dialog
-	ConfirmStyle = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(colorWarn).
-			Padding(1, 2).
-			Align(lipgloss.Center)
-
 	// Input prompt
 	InputLabelStyle = lipgloss.NewStyle().
 			Foreground(colorPrimary).
 			Bold(true)
-
-	InputStyle = lipgloss.NewStyle().
-			Foreground(colorFile)
 
 	// Title
 	TitleStyle = lipgloss.NewStyle().
@@ -284,18 +274,9 @@ func ApplyTheme(colorscheme string, overrides config.ThemeConfig) {
 	Base64ValueStyle = lipgloss.NewStyle().
 		Foreground(base64Color)
 
-	ConfirmStyle = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(colorWarn).
-		Padding(1, 2).
-		Align(lipgloss.Center)
-
 	InputLabelStyle = lipgloss.NewStyle().
 		Foreground(colorPrimary).
 		Bold(true)
-
-	InputStyle = lipgloss.NewStyle().
-		Foreground(colorFile)
 
 	TitleStyle = lipgloss.NewStyle().
 		Foreground(titleColor).

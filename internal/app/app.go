@@ -3512,7 +3512,7 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 			}
 			reverse = model.UndoAction{Type: model.UndoDeleteSecret, Description: action.Description, Path: action.Path, Data: data, Keys: keys}
 
-		case model.UndoDeleteSecret, model.UndoCutSecret:
+		case model.UndoDeleteSecret:
 			// Undo delete/cut = recreate
 			if err := m.client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("undo: " + err.Error())

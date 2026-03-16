@@ -45,9 +45,8 @@ type UndoType int
 
 const (
 	UndoCreateSecret UndoType = iota // undo = delete the created secret
-	UndoDeleteSecret                 // undo = recreate with stored data
-	UndoCutSecret                    // undo = recreate at original path (legacy, unused)
-	UndoRenameSecret                 // undo = rename back (Path=new, OldPath=old)
+	UndoDeleteSecret // undo = recreate with stored data
+	UndoRenameSecret // undo = rename back (Path=new, OldPath=old)
 	UndoPasteSecret                  // undo = delete pasted secret
 	UndoCutPaste                     // undo = delete dest (Path) + recreate source (OldPath)
 	UndoEditSecret                   // undo = restore full secret snapshot
