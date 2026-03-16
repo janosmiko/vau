@@ -1292,7 +1292,7 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchKey(key, m.keys.NewTab):
-		if len(m.tabs) < 10 {
+		if len(m.tabs) < 9 {
 			m.saveCurrentTab()
 			newTab := m.tabs[m.activeTab] // struct copy
 			// Deep copy maps for the new tab
