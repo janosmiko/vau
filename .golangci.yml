@@ -1,0 +1,58 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    # Default linters
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Style & correctness
+    - misspell
+    - unconvert
+    - unparam
+    - wastedassign
+
+    # Bug detection
+    - bodyclose
+    - copyloopvar
+    - durationcheck
+    - nilerr
+
+    # Security
+    - gosec
+
+  settings:
+    errcheck:
+      # Ignore errors on cleanup/best-effort operations.
+      exclude-functions:
+        - os.Remove
+        - os.Chmod
+        - (*os.File).Close
+    gosec:
+      excludes:
+        # CLI app legitimately reads files from computed paths.
+        - G304
+        # CLI app legitimately launches a user-configured editor.
+        - G204
+        # Overlaps with errcheck; cleanup errors are intentionally ignored.
+        - G104
+        # Path traversal via taint: temp files are created by us, not user input.
+        - G703
+        # Command injection via taint: editor is validated with LookPath.
+        - G702
+        # Directories: allow 0755 for compatibility.
+        - G301
+        # Files: allow 0644 for config files.
+        - G306
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+issues:
+  max-same-issues: 5
