@@ -23,10 +23,12 @@ RUN CGO_ENABLED=0 go build -ldflags "\
 # Runtime stage
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates && \
+    adduser -D -h /home/vau vau
 
 COPY --from=builder /vau /usr/local/bin/vau
 ENV TERM=xterm-256color
 ENV COLORTERM=truecolor
 
+USER vau
 ENTRYPOINT ["vau"]

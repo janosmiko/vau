@@ -30,5 +30,12 @@ Thumbs.db
 # Goreleaser
 dist/
 
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
 # TODO (local)
 TODO.md
