@@ -3,6 +3,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,7 +37,17 @@ func NewClient() (*Client, error) {
 
 	token := os.Getenv("VAULT_TOKEN")
 	if token == "" {
-		return nil, fmt.Errorf("VAULT_TOKEN environment variable is not set")
+		// Fall back to ~/.vault-token file (written by "vault login").
+		home, err := os.UserHomeDir()
+		if err == nil {
+			data, err := os.ReadFile(filepath.Join(home, ".vault-token"))
+			if err == nil {
+				token = strings.TrimSpace(string(data))
+			}
+		}
+	}
+	if token == "" {
+		return nil, fmt.Errorf("vault token not found: set VAULT_TOKEN or log in with \"vault login\" (~/.vault-token)")
 	}
 	raw.SetToken(token)
 
