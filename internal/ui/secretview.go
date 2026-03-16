@@ -67,7 +67,7 @@ func RenderSecretOverlay(
 	// Data content
 	var dataContent string
 	if jsonView {
-		dataContent = renderSecretPopupJSON(secret, panelContentW, panelContentH)
+		dataContent = renderSecretPopupJSON(secret, panelContentH)
 	} else {
 		dataContent = renderSecretTable(secret, selectedIdx, revealedKeys, base64Keys, editingKey, editingView, editingColumn, panelContentW, panelContentH)
 	}
@@ -206,7 +206,7 @@ func renderSecretTable(
 	return strings.Join(lines, "\n")
 }
 
-func renderSecretPopupJSON(secret *model.Secret, width, height int) string {
+func renderSecretPopupJSON(secret *model.Secret, height int) string {
 	var lines []string
 	lines = append(lines, HelpDescStyle.Render("{"))
 	limit := height - 2

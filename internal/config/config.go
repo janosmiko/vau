@@ -17,11 +17,11 @@ type Bookmark struct {
 
 // Config holds user configuration loaded from ~/.config/vau/config.yaml.
 type Config struct {
-	Editor      string              `yaml:"editor"`      // override $EDITOR
-	Colorscheme string              `yaml:"colorscheme"` // built-in colorscheme name
-	Theme       ThemeConfig         `yaml:"theme"`
-	Bookmarks   []Bookmark           `yaml:"bookmarks"`   // pre-configured bookmarks
-	Keybindings map[string]string   `yaml:"keybindings"` // action name -> key string overrides
+	Editor      string            `yaml:"editor"`      // override $EDITOR
+	Colorscheme string            `yaml:"colorscheme"` // built-in colorscheme name
+	Theme       ThemeConfig       `yaml:"theme"`
+	Bookmarks   []Bookmark        `yaml:"bookmarks"`   // pre-configured bookmarks
+	Keybindings map[string]string `yaml:"keybindings"` // action name -> key string overrides
 }
 
 // ThemeConfig allows customizing the color palette via hex strings (e.g. "#ff0000").
@@ -121,7 +121,7 @@ func bookmarksPath() (string, error) {
 func Load() (*Config, error) {
 	path, err := configPath()
 	if err != nil {
-		return &Config{}, nil
+		return &Config{}, nil //nolint:nilerr // graceful fallback to defaults
 	}
 
 	data, err := os.ReadFile(path)
@@ -146,7 +146,7 @@ func Load() (*Config, error) {
 func LoadBookmarks() ([]Bookmark, error) {
 	path, err := bookmarksPath()
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // graceful fallback to empty bookmarks
 	}
 
 	data, err := os.ReadFile(path)
@@ -215,4 +215,3 @@ func SaveBookmarks(bookmarks []Bookmark) error {
 	}
 	return os.WriteFile(path, data, 0o600)
 }
-

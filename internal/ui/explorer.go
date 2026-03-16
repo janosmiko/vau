@@ -319,7 +319,7 @@ func renderPreview(entries []model.Entry, secret *model.Secret, previewMode mode
 
 func renderSecretPreview(secret *model.Secret, previewMode model.PreviewMode, width, height int) string {
 	if previewMode == model.PreviewJSON {
-		return renderSecretJSON(secret, width, height)
+		return renderSecretJSON(secret, height)
 	}
 
 	sepW := width - 2
@@ -351,7 +351,7 @@ func renderSecretPreview(secret *model.Secret, previewMode model.PreviewMode, wi
 	return strings.Join(lines, "\n")
 }
 
-func renderSecretJSON(secret *model.Secret, width, height int) string {
+func renderSecretJSON(secret *model.Secret, height int) string {
 	var lines []string
 	lines = append(lines, HelpDescStyle.Render("{"))
 	limit := height - 2

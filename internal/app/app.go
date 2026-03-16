@@ -36,9 +36,9 @@ type (
 		mounts []string
 		err    error
 	}
-	statusMsg        string
-	errorMsg         string
-	confirmCreateMsg string // path to create after overwrite confirmation
+	statusMsg         string
+	errorMsg          string
+	confirmCreateMsg  string // path to create after overwrite confirmation
 	undoableStatusMsg struct {
 		status       string
 		undo         model.UndoAction
@@ -63,7 +63,7 @@ type (
 		data          map[string]string
 		newSecretPath string // non-empty when creating a new secret via editor
 	}
-	newSecretEditorMsg      string // path for new secret to open in editor
+	newSecretEditorMsg     string // path for new secret to open in editor
 	confirmCreateEditorMsg string // path to create after overwrite confirmation (editor flow)
 	newSecretInlineMsg     struct {
 		secret *model.Secret
@@ -113,10 +113,10 @@ type Model struct {
 	mountCursor  int
 
 	// Explorer state
-	path       []string // current path segments (each ends with / for dirs)
-	entries    []model.Entry
-	cursor     int
-	parentList []model.Entry
+	path         []string // current path segments (each ends with / for dirs)
+	entries      []model.Entry
+	cursor       int
+	parentList   []model.Entry
 	cursorMemory map[string]int // remembered cursor position per directory path
 
 	// Preview state
@@ -125,11 +125,11 @@ type Model struct {
 	previewMode    model.PreviewMode
 
 	// Secret view state
-	mode          model.ViewMode
-	secret        *model.Secret
-	secretCursor  int
-	revealed      map[string]bool
-	secretBase64  map[string]bool // tracks base64 decode toggle per key
+	mode              model.ViewMode
+	secret            *model.Secret
+	secretCursor      int
+	revealed          map[string]bool
+	secretBase64      map[string]bool // tracks base64 decode toggle per key
 	secretAllRevealed bool
 	secretJSONView    bool
 	secretEditKey     string // key being inline-edited
@@ -145,10 +145,10 @@ type Model struct {
 	versionPath    string // path of the secret whose history we're viewing
 
 	// Confirm dialog
-	confirmMsg       string
-	confirmAction    func() tea.Cmd
-	prevConfirmMode  model.ViewMode // mode to return to after confirm
-	confirmInput     textinput.Model
+	confirmMsg      string
+	confirmAction   func() tea.Cmd
+	prevConfirmMode model.ViewMode // mode to return to after confirm
+	confirmInput    textinput.Model
 
 	// Input prompt
 	inputAction model.InputAction
@@ -164,9 +164,9 @@ type Model struct {
 
 	// Search (s = jump-to) and Filter (/ = hide non-matching)
 	searchInput textinput.Model
-	priorCursor int      // cursor before search started
-	filterQuery string   // active filter text (empty = no filter)
-	filteredIdx []int    // indices into m.entries matching filter
+	priorCursor int    // cursor before search started
+	filterQuery string // active filter text (empty = no filter)
+	filteredIdx []int  // indices into m.entries matching filter
 
 	// Status/error messages
 	status string
@@ -187,10 +187,10 @@ type Model struct {
 	redoStack []model.UndoAction
 
 	// Bookmarks
-	bookmarks          []config.Bookmark
-	bookmarkFilter     string
-	bookmarkCursor     int
-	bookmarkSearching  bool // true when typing in the filter input
+	bookmarks         []config.Bookmark
+	bookmarkFilter    string
+	bookmarkCursor    int
+	bookmarkSearching bool // true when typing in the filter input
 
 	// Theme picker
 	themeEntries      []ui.ThemeEntry // grouped theme list with headers
@@ -2071,12 +2071,6 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.secretEditOrigKey == "" && m.secretEditKey == "" {
 			// Remove the empty placeholder row we added
 			delete(m.secret.Data, "")
-			newKeys := make([]string, 0, len(m.secret.Keys))
-			for _, k := range m.secret.Keys {
-				if k != "" || m.secret.Data[k] != "" {
-					newKeys = append(newKeys, k)
-				}
-			}
 			// Just remove last empty key (the one we added)
 			m.secret.Keys = m.removeLastEmptyKey()
 			if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
