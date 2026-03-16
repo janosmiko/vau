@@ -23,6 +23,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
