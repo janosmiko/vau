@@ -138,7 +138,7 @@ func TestSkipVisualWidth(t *testing.T) {
 func TestRenderBookmarkOverlayEmpty(t *testing.T) {
 	result := RenderBookmarkOverlay(nil, "", false, 0, 80, 40)
 	assert.Contains(t, result, "No bookmarks yet")
-	assert.Contains(t, result, "Bookmarks")
+	assert.Contains(t, result, "Marks")
 }
 
 func TestRenderBookmarkOverlayWithBookmarks(t *testing.T) {
@@ -149,7 +149,7 @@ func TestRenderBookmarkOverlayWithBookmarks(t *testing.T) {
 	result := RenderBookmarkOverlay(bookmarks, "", false, 0, 80, 40)
 	assert.Contains(t, result, "prod-secrets")
 	assert.Contains(t, result, "dev-db")
-	assert.Contains(t, result, "Bookmarks")
+	assert.Contains(t, result, "Marks")
 	assert.NotContains(t, result, "No bookmarks yet")
 }
 

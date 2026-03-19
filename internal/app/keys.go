@@ -93,8 +93,8 @@ func DefaultKeyMap() KeyMap {
 		PrevTab:  []string{"["},
 		CloseTab: []string{"ctrl+c"},
 
-		BookmarkSave: []string{"B"},
-		BookmarkShow: []string{"b"},
+		BookmarkSave: []string{"m"},
+		BookmarkShow: []string{"'"},
 
 		ThemePicker: []string{"T"},
 	}

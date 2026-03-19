@@ -89,7 +89,7 @@ func RenderInputOverlay(label string, inputView string, width int) string {
 // RenderConfirmOverlay renders a centered confirmation dialog overlay.
 // It displays the message and a text input where the user must type "DELETE" to confirm.
 func RenderConfirmOverlay(message string, inputView string, width int) string {
-	boxWidth := width / 3
+	boxWidth := width / 2
 	if boxWidth < 40 {
 		boxWidth = 40
 	}
@@ -186,7 +186,7 @@ func RenderSearchOverlay(label string, inputView string, width int) string {
 
 // RenderBookmarkOverlay renders a centered bookmark overlay with filter and cursor navigation.
 func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, searching bool, cursor int, width, height int) string {
-	boxWidth := width / 2
+	boxWidth := width / 3
 	if boxWidth < 40 {
 		boxWidth = 40
 	}
@@ -199,7 +199,7 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 		maxEntryW = 10
 	}
 
-	content := InputLabelStyle.Render("Bookmarks")
+	content := InputLabelStyle.Render("Marks")
 
 	// Show filter input only when searching or filter is active
 	if searching {
@@ -223,7 +223,7 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 
 	if len(allBookmarks) == 0 {
 		content += "\n\n" + HelpDescStyle.Render("  No bookmarks yet")
-		content += "\n" + HelpDescStyle.Render("  Press B to bookmark current location")
+		content += "\n" + HelpDescStyle.Render("  Press m + [a-z,0-9] to set a mark")
 	} else if len(filtered) == 0 {
 		content += "\n\n" + HelpDescStyle.Render("  No matching bookmarks")
 	} else {
@@ -249,13 +249,28 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 		for i := start; i < end; i++ {
 			bm := filtered[i]
 			name := bm.Name
-			if len(name) > maxEntryW {
-				name = "..." + name[len(name)-maxEntryW+3:]
+			if len(name) > maxEntryW-4 {
+				name = "..." + name[len(name)-maxEntryW+7:]
 			}
+
 			if i == cursor {
-				content += "\n" + SelectedStyle.Render(" "+name+" ")
+				// Selected: plain text with highlight background
+				var prefix string
+				if bm.Slot != "" {
+					prefix = bm.Slot + " "
+				} else {
+					prefix = "  "
+				}
+				content += "\n" + SelectedStyle.Render(" "+prefix+name+" ")
 			} else {
-				content += "\n" + HelpDescStyle.Render(" "+name)
+				// Non-selected: slot key in bold green
+				var prefix string
+				if bm.Slot != "" {
+					prefix = HelpKeyStyle.Render(bm.Slot) + " "
+				} else {
+					prefix = "  "
+				}
+				content += "\n " + prefix + HelpDescStyle.Render(name)
 			}
 		}
 		if len(filtered) > maxShow {
@@ -264,10 +279,11 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 	}
 
 	content += "\n\n" +
+		HelpKeyStyle.Render("a-z/0-9") + HelpDescStyle.Render(" quick jump  ") +
 		HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" jump  ") +
 		HelpKeyStyle.Render("/") + HelpDescStyle.Render(" filter  ") +
-		HelpKeyStyle.Render("d") + HelpDescStyle.Render(" delete  ") +
-		HelpKeyStyle.Render("D") + HelpDescStyle.Render(" delete all  ") +
+		HelpKeyStyle.Render("D") + HelpDescStyle.Render(" del  ") +
+		HelpKeyStyle.Render("ctrl+x") + HelpDescStyle.Render(" del all  ") +
 		HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" close")
 
 	return overlayBoxStyle.Width(boxWidth).Render(content)
@@ -276,7 +292,7 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 // RenderThemePickerOverlay renders a centered colorscheme picker overlay
 // with entries grouped by dark/light themes.
 func RenderThemePickerOverlay(entries []ThemeEntry, cursor int, activeTheme string, width, height int) string {
-	boxWidth := width / 3
+	boxWidth := width / 2
 	if boxWidth < 40 {
 		boxWidth = 40
 	}

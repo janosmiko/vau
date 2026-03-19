@@ -112,7 +112,7 @@ vau --version    # Print version information
 - **Jump to path** - Navigate directly to any Vault path with tab completion (`J`)
 - **Undo / redo** - Reverse destructive actions (`u` / `Ctrl+R`)
 - **Tabs** - Multiple tabs with independent navigation state (`t` to create, `[`/`]` to switch)
-- **Bookmarks** - Save and jump to frequently used paths (`B` to save, `b` to browse)
+- **Marks** - Save and jump to frequently used paths (`m` + slot key to set, `'` to browse and quick-jump)
 - **Version history** - Browse secret versions for KV v2 mounts (`H`)
 - **Base64 decode** - Toggle decoded view for base64-encoded values (`b` in secret popup)
 - **Mouse support** - Click entries, tabs, and scroll with the mouse wheel
@@ -174,8 +174,8 @@ vau --version    # Print version information
 | `t` | New tab (clone current) |
 | `[` / `]` | Switch to previous / next tab |
 | `Ctrl+C` | Close tab (quit if last) |
-| `b` | Show bookmarks |
-| `B` | Save current location as bookmark |
+| `m` + `[a-z,0-9]` | Set mark at current location |
+| `'` | Open marks overlay |
 | `T` | Change colorscheme |
 | `?` | Show help screen |
 | `q` | Quit |
@@ -221,18 +221,21 @@ When editing a key-value pair (`e`) or adding a new one (`a`):
 | `Enter` | Save changes |
 | `Esc` | Cancel edit |
 
-### Bookmarks (`b`)
+### Marks (`m` / `'`)
 
-Opens an overlay listing all saved bookmarks.
+Vim-style named marks for quick navigation. Press `m` followed by a slot key (`a-z`, `0-9`) to set a mark at the current location. If the slot is already occupied, you will be prompted to press the same combo again to overwrite. Press `'` to open the marks overlay where you can browse all saved marks. Inside the overlay, pressing a slot key (`a-z`, `0-9`) performs a quick jump to that mark.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Navigate bookmarks |
-| `Enter` / `l` | Jump to selected bookmark |
-| `/` | Filter bookmarks |
-| `d` | Delete selected bookmark |
-| `D` | Delete all bookmarks |
-| `Esc` | Close (clears filter first, then closes) |
+| `m` + `[a-z,0-9]` | Set mark at current location |
+| `'` | Open marks overlay |
+| `[a-z,0-9]` | Quick jump to mark (in overlay) |
+| `j` / `k` | Navigate (in overlay) |
+| `Enter` / `l` | Jump to selected (in overlay) |
+| `/` | Filter (in overlay) |
+| `D` | Delete selected (in overlay) |
+| `Ctrl+X` | Delete all (in overlay) |
+| `Esc` | Close overlay |
 
 ### Colorscheme Picker (`T`)
 
@@ -361,7 +364,7 @@ keybindings:
   jump_path: "S"
   delete: "ctrl+d"
   bookmark_save: "M"
-  bookmark_show: "m"
+  bookmark_show: ","
 ```
 
 The default theme is Tokyo Night. Only specify colors you want to change - unset fields keep the defaults.
@@ -406,8 +409,8 @@ The `keybindings` section maps action names to key strings. Each override replac
 | `next_tab` | `]` | Switch to next tab |
 | `prev_tab` | `[` | Switch to previous tab |
 | `close_tab` | `ctrl+c` | Close tab (quit if last) |
-| `bookmark_save` | `B` | Save current location as bookmark |
-| `bookmark_show` | `b` | Show bookmarks overlay |
+| `bookmark_save` | `m` | Set mark (+ slot key a-z, 0-9) |
+| `bookmark_show` | `'` | Open marks overlay |
 | `theme_picker` | `T` | Open colorscheme picker |
 
 When overriding, you specify a single key string that replaces all default bindings for that action.
@@ -439,9 +442,9 @@ Built-in colorschemes:
 
 You can further customize individual colors on top of any colorscheme using the `theme` section in your config.
 
-### Bookmarks
+### Marks (Bookmarks)
 
-Bookmarks are saved automatically to `~/.local/state/vau/bookmarks.yaml` (following the XDG specification). You can also pre-configure bookmarks in your config file (see example above). Pre-configured bookmarks are merged with runtime bookmarks on startup.
+Marks are saved automatically to `~/.local/state/vau/bookmarks.yaml` (following the XDG specification). Each mark has an optional slot key (`a-z`, `0-9`) for quick access via `m` + slot to save. Press `'` to open the marks overlay, then press a slot key for quick jump or use `j`/`k` to navigate and `Enter` to jump. If you save a mark to an already-occupied slot, you will be prompted to press the same combo again to overwrite. You can also pre-configure bookmarks in your config file (see example above). Pre-configured bookmarks are merged with runtime marks on startup.
 
 ## Clipboard
 

@@ -194,6 +194,10 @@ type Model struct {
 	bookmarkCursor    int
 	bookmarkSearching bool // true when typing in the filter input
 
+	// Mark pending state (vim-style two-key sequences)
+	markPending     bool   // true after pressing m, waiting for slot key
+	lastMarkAttempt string // tracks last "m+slot" attempt for overwrite confirmation
+
 	// Theme picker
 	themeEntries      []ui.ThemeEntry // grouped theme list with headers
 	themeCursor       int
@@ -1275,6 +1279,11 @@ func (m *Model) handleMountKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
+	// Handle mark pending states (two-key sequences like m+a, '+a)
+	if m.markPending {
+		m.markPending = false
+		return m.handleMarkSave(key)
+	}
 	switch {
 	case matchKey(key, m.keys.Quit):
 		return m, tea.Quit
@@ -1627,29 +1636,11 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case matchKey(key, m.keys.BookmarkSave):
-		// Save current location as a bookmark immediately
-		name := m.client.Mount() + "/" + m.currentPath()
-		// Dedup: don't add if already exists with same mount+path
-		for _, bm := range m.bookmarks {
-			if bm.Mount == m.client.Mount() && bm.Path == m.currentPath() {
-				m.status = "Bookmark already exists: " + name
-				return m, nil
-			}
-		}
-		m.bookmarks = append(m.bookmarks, config.Bookmark{
-			Name:  name,
-			Mount: m.client.Mount(),
-			Path:  m.currentPath(),
-		})
-		if err := config.SaveBookmarks(m.bookmarks); err != nil {
-			m.errMsg = "Failed to save bookmark: " + err.Error()
-			return m, nil
-		}
-		m.status = "Bookmark saved: " + name
+		m.markPending = true
+		m.status = "Set mark: [a-z, 0-9]"
 		return m, nil
 
 	case matchKey(key, m.keys.BookmarkShow):
-		// Open bookmark overlay
 		m.mode = model.ModeBookmark
 		m.bookmarkFilter = ""
 		m.bookmarkCursor = 0
@@ -1734,7 +1725,7 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "d":
+	case "D":
 		if len(filtered) > 0 && m.bookmarkCursor < len(filtered) {
 			bm := filtered[m.bookmarkCursor]
 			for i, b := range m.bookmarks {
@@ -1750,16 +1741,16 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			if len(m.bookmarks) == 0 {
 				m.mode = model.ModeExplorer
-				m.status = "All bookmarks deleted"
+				m.status = "All marks deleted"
 			}
 		}
 		return m, nil
 
-	case "D":
+	case "ctrl+x":
 		m.bookmarks = nil
 		_ = config.SaveBookmarks(m.bookmarks)
 		m.mode = model.ModeExplorer
-		m.status = "All bookmarks deleted"
+		m.status = "All marks deleted"
 		return m, nil
 
 	case "j", "down", "ctrl+n":
@@ -1773,6 +1764,20 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.bookmarkCursor--
 		}
 		return m, nil
+
+	default:
+		// Quick jump: pressing a slot key (a-z, 0-9) jumps directly to that mark
+		if len(key) == 1 && ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= '0' && key[0] <= '9')) {
+			for _, bm := range m.bookmarks {
+				if bm.Slot == key {
+					m.mode = model.ModeExplorer
+					return m, m.jumpToBookmark(bm)
+				}
+			}
+			m.status = fmt.Sprintf("Mark '%s' not set", key)
+			m.mode = model.ModeExplorer
+			return m, nil
+		}
 	}
 	return m, nil
 }
@@ -1807,6 +1812,72 @@ func (m *Model) handleBookmarkMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	return m, nil
+}
+
+// handleMarkSave processes the second key after pressing the mark key (m).
+// Valid keys (a-z, 0-9) save the current location to that slot.
+// If the slot is already occupied, shows a warning and requires pressing m+slot again to overwrite.
+func (m *Model) handleMarkSave(key string) (tea.Model, tea.Cmd) {
+	if key == "esc" {
+		m.status = ""
+		m.lastMarkAttempt = ""
+		return m, nil
+	}
+	// Only accept single alphanumeric characters as slot names
+	if len(key) != 1 || (key[0] < 'a' || key[0] > 'z') && (key[0] < '0' || key[0] > '9') {
+		m.status = "Invalid mark key (use a-z, 0-9)"
+		m.lastMarkAttempt = ""
+		return m, nil
+	}
+	slot := key
+	mount := m.client.Mount()
+	path := m.currentPath()
+	name := mount + "/" + path
+
+	// Check if slot is already occupied
+	for i, bm := range m.bookmarks {
+		if bm.Slot == slot {
+			if bm.Mount == mount && bm.Path == path {
+				m.status = "Mark '" + slot + "' already set to this location"
+				m.lastMarkAttempt = ""
+				return m, nil
+			}
+			// Slot exists with different location — check if this is a confirmed overwrite
+			if m.lastMarkAttempt == slot {
+				// Second press — overwrite
+				m.bookmarks[i].Mount = mount
+				m.bookmarks[i].Path = path
+				m.bookmarks[i].Name = name
+				if err := config.SaveBookmarks(m.bookmarks); err != nil {
+					m.errMsg = "Failed to save mark: " + err.Error()
+					m.lastMarkAttempt = ""
+					return m, nil
+				}
+				m.status = fmt.Sprintf("Mark '%s' updated: %s", slot, name)
+				m.lastMarkAttempt = ""
+				return m, nil
+			}
+			// First press — warn and remember attempt
+			m.lastMarkAttempt = slot
+			m.status = fmt.Sprintf("Mark '%s' already set (%s) — press m+%s again to overwrite", slot, bm.Name, slot)
+			return m, nil
+		}
+	}
+
+	// Slot is free — save directly
+	m.lastMarkAttempt = ""
+	m.bookmarks = append(m.bookmarks, config.Bookmark{
+		Name:  name,
+		Mount: mount,
+		Path:  path,
+		Slot:  slot,
+	})
+	if err := config.SaveBookmarks(m.bookmarks); err != nil {
+		m.errMsg = "Failed to save mark: " + err.Error()
+		return m, nil
+	}
+	m.status = fmt.Sprintf("Mark '%s' set: %s", slot, name)
 	return m, nil
 }
 
@@ -2952,15 +3023,16 @@ func (m *Model) listParent() tea.Cmd {
 }
 
 func (m *Model) loadPreview() tea.Cmd {
-	m.previewMode = model.PreviewHidden
 	entry := m.selectedEntry()
 	if entry == nil {
+		m.previewMode = model.PreviewHidden
 		m.previewEntries = nil
 		m.previewSecret = nil
 		return nil
 	}
 
 	if entry.IsDir {
+		m.previewMode = model.PreviewHidden
 		m.previewSecret = nil
 		path := m.currentPath() + entry.Name
 		return func() tea.Msg {
@@ -2972,9 +3044,13 @@ func (m *Model) loadPreview() tea.Cmd {
 		}
 	}
 
-	// It's a secret — load preview
-	m.previewEntries = nil
+	// It's a secret — load preview.
+	// Only reset visibility if the cursor moved to a different secret.
 	path := m.currentPath() + entry.Name
+	if m.previewSecret == nil || m.previewSecret.Path != path {
+		m.previewMode = model.PreviewHidden
+	}
+	m.previewEntries = nil
 	return func() tea.Msg {
 		secret, err := m.client.Read(path)
 		return secretResultMsg{path: path, secret: secret, err: err}

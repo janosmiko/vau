@@ -13,6 +13,7 @@ type Bookmark struct {
 	Name  string `yaml:"name"`
 	Mount string `yaml:"mount"`
 	Path  string `yaml:"path"`
+	Slot  string `yaml:"slot,omitempty"` // optional single-char slot (a-z, 0-9)
 }
 
 // Config holds user configuration loaded from ~/.config/vau/config.yaml.

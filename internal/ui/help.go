@@ -31,7 +31,7 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"D", "del"},
 			{"y/p/x", "yank/paste/cut"},
 			{"u", "undo"},
-			{"b/B", "bookmark"},
+			{"m+'", "mark/jump"},
 			{"T", "theme"},
 			{"?", "help"},
 			{"q", "quit"},
@@ -68,7 +68,8 @@ func HelpBar(mode model.ViewMode, width int) string {
 	case model.ModeBookmark:
 		bindings = []helpBinding{
 			{"enter", "jump"},
-			{"ctrl+d", "delete"},
+			{"a-z/0-9", "quick jump"},
+			{"D", "delete"},
 			{"esc", "close"},
 		}
 	}
@@ -140,8 +141,8 @@ func helpSections() []helpSection {
 				{"[", "Switch to previous tab"},
 				{"]", "Switch to next tab"},
 				{"Ctrl+C", "Close tab (quit if last)"},
-				{"b", "Show bookmarks"},
-				{"B", "Save bookmark"},
+				{"'", "Open marks (quick jump with slot key)"},
+				{"m", "Set mark (+ slot key a-z, 0-9)"},
 				{"T", "Change colorscheme"},
 				{"?", "Show this help screen"},
 				{"q", "Quit"},
@@ -209,14 +210,17 @@ func helpSections() []helpSection {
 			},
 		},
 		{
-			title: "Bookmarks (b)",
+			title: "Marks (m / ')",
 			bindings: []helpBinding{
-				{"j / k", "Navigate"},
-				{"Enter / l", "Jump to bookmark"},
-				{"/", "Filter bookmarks"},
-				{"d", "Delete bookmark"},
-				{"D", "Delete all bookmarks"},
-				{"Esc", "Close (clear filter first)"},
+				{"m + [a-z,0-9]", "Set mark at current location"},
+				{"'", "Open marks overlay"},
+				{"[a-z,0-9]", "Quick jump to mark (in overlay)"},
+				{"j / k", "Navigate (in overlay)"},
+				{"Enter / l", "Jump to selected (in overlay)"},
+				{"/", "Filter (in overlay)"},
+				{"D", "Delete selected (in overlay)"},
+				{"Ctrl+X", "Delete all (in overlay)"},
+				{"Esc", "Close overlay"},
 			},
 		},
 		{
