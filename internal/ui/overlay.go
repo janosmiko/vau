@@ -160,12 +160,6 @@ func RenderJumpPathOverlay(inputView string, completions []string, selectedIdx i
 		}
 	}
 
-	// Help line
-	content += "\n" +
-		HelpKeyStyle.Render("Tab") + HelpDescStyle.Render(" complete  ") +
-		HelpKeyStyle.Render("Enter") + HelpDescStyle.Render(" go  ") +
-		HelpKeyStyle.Render("Esc") + HelpDescStyle.Render(" cancel")
-
 	return overlayBoxStyle.Width(boxWidth).Render(content)
 }
 
@@ -278,14 +272,6 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 		}
 	}
 
-	content += "\n\n" +
-		HelpKeyStyle.Render("a-z/0-9") + HelpDescStyle.Render(" quick jump  ") +
-		HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" jump  ") +
-		HelpKeyStyle.Render("/") + HelpDescStyle.Render(" filter  ") +
-		HelpKeyStyle.Render("D") + HelpDescStyle.Render(" del  ") +
-		HelpKeyStyle.Render("ctrl+x") + HelpDescStyle.Render(" del all  ") +
-		HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" close")
-
 	return overlayBoxStyle.Width(boxWidth).Render(content)
 }
 
@@ -359,11 +345,6 @@ func RenderThemePickerOverlay(entries []ThemeEntry, cursor int, activeTheme stri
 			}
 		}
 	}
-
-	content += "\n\n" +
-		HelpKeyStyle.Render("enter") + HelpDescStyle.Render(" select  ") +
-		HelpKeyStyle.Render("j/k") + HelpDescStyle.Render(" navigate  ") +
-		HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" cancel")
 
 	return overlayBoxStyle.Width(boxWidth).Render(content)
 }

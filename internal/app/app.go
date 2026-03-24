@@ -198,6 +198,9 @@ type Model struct {
 	markPending     bool   // true after pressing m, waiting for slot key
 	lastMarkAttempt string // tracks last "m+slot" attempt for overwrite confirmation
 
+	// Copy format pending (Y + j/y/d for json/yaml/dotenv)
+	copyFormatPending bool
+
 	// Theme picker
 	themeEntries      []ui.ThemeEntry // grouped theme list with headers
 	themeCursor       int
@@ -1977,7 +1980,15 @@ func (m *Model) jumpToBookmark(bm config.Bookmark) tea.Cmd {
 }
 
 func (m *Model) handleSecretKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+
+	// Handle copy format pending (Y + j/y/d)
+	if m.copyFormatPending {
+		m.copyFormatPending = false
+		return m.handleCopyFormat(key)
+	}
+
+	switch key {
 	case "q", "esc", "h":
 		m.mode = model.ModeExplorer
 		m.secret = nil
@@ -2027,6 +2038,14 @@ func (m *Model) handleSecretKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			key := m.secret.Keys[m.secretCursor]
 			val := m.secret.Data[key]
 			return m, copyToSystemClipboard(val, key)
+		}
+
+	case "Y":
+		// Copy entire secret — choose format
+		if m.secret != nil {
+			m.copyFormatPending = true
+			m.status = "Copy as: (j)son  (y)aml  (d)otenv"
+			return m, nil
 		}
 
 	case "p":
@@ -2488,6 +2507,65 @@ func (m *Model) copySecretAsJSON() tea.Cmd {
 		return func() tea.Msg { return errorMsg("json: " + err.Error()) }
 	}
 	return copyToSystemClipboard(string(data), "secret JSON")
+}
+
+func (m *Model) copySecretAsYAML() tea.Cmd {
+	if m.secret == nil {
+		return nil
+	}
+	var buf strings.Builder
+	for _, k := range m.secret.Keys {
+		v := m.secret.Data[k]
+		// Quote values that contain special YAML characters or are empty
+		if v == "" || strings.ContainsAny(v, ":#{}[]&*!|>'\",\n") || v == "true" || v == "false" || v == "null" {
+			buf.WriteString(k + ": " + strconv.Quote(v) + "\n")
+		} else {
+			buf.WriteString(k + ": " + v + "\n")
+		}
+	}
+	return copyToSystemClipboard(buf.String(), "secret YAML")
+}
+
+func (m *Model) copySecretAsDotenv() tea.Cmd {
+	if m.secret == nil {
+		return nil
+	}
+	var buf strings.Builder
+	for _, k := range m.secret.Keys {
+		v := m.secret.Data[k]
+		// Use double quotes for values containing special characters
+		if strings.ContainsAny(v, " \t\n\"'\\$`!#") || v == "" {
+			escaped := strings.ReplaceAll(v, "\\", "\\\\")
+			escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+			escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+			buf.WriteString(k + "=\"" + escaped + "\"\n")
+		} else {
+			buf.WriteString(k + "=" + v + "\n")
+		}
+	}
+	return copyToSystemClipboard(buf.String(), "secret dotenv")
+}
+
+// handleCopyFormat processes the second key after pressing Y in the secret popup.
+func (m *Model) handleCopyFormat(key string) (tea.Model, tea.Cmd) {
+	if m.secret == nil {
+		m.status = ""
+		return m, nil
+	}
+	switch key {
+	case "j":
+		m.status = ""
+		return m, m.copySecretAsJSON()
+	case "y":
+		m.status = ""
+		return m, m.copySecretAsYAML()
+	case "d":
+		m.status = ""
+		return m, m.copySecretAsDotenv()
+	default:
+		m.status = ""
+		return m, nil
+	}
 }
 
 func (m *Model) enterConfirmMode() {

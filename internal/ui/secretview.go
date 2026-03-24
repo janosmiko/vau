@@ -78,28 +78,7 @@ func RenderSecretOverlay(
 		Height(panelContentH).
 		Render(dataContent)
 
-	// Help line
-	var helpLine string
-	if editingColumn >= 0 {
-		helpLine = HelpKeyStyle.Render("Tab") + HelpDescStyle.Render(" switch col") + "  " +
-			HelpKeyStyle.Render("Enter") + HelpDescStyle.Render(" save") + "  " +
-			HelpKeyStyle.Render("Esc") + HelpDescStyle.Render(" cancel")
-	} else {
-		helpLine = HelpKeyStyle.Render("jk") + HelpDescStyle.Render(" nav") + "  " +
-			HelpKeyStyle.Render("v") + HelpDescStyle.Render(" toggle") + "  " +
-			HelpKeyStyle.Render("V") + HelpDescStyle.Render(" json") + "  " +
-			HelpKeyStyle.Render("b") + HelpDescStyle.Render(" b64") + "  " +
-			HelpKeyStyle.Render("y") + HelpDescStyle.Render(" copy") + "  " +
-			HelpKeyStyle.Render("p") + HelpDescStyle.Render(" paste") + "  " +
-			HelpKeyStyle.Render("e") + HelpDescStyle.Render(" edit") + "  " +
-			HelpKeyStyle.Render("a") + HelpDescStyle.Render(" add") + "  " +
-			HelpKeyStyle.Render("H") + HelpDescStyle.Render(" history") + "  " +
-			HelpKeyStyle.Render("D") + HelpDescStyle.Render(" del") + "  " +
-			HelpKeyStyle.Render("^d/^u") + HelpDescStyle.Render(" scroll") + "  " +
-			HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" close")
-	}
-
-	body := title + "\n" + innerPanel + "\n" + helpLine
+	body := title + "\n" + innerPanel
 
 	return overlayBoxStyle.
 		Width(boxW).
@@ -361,11 +340,7 @@ func RenderVersionHistoryOverlay(versions []model.SecretVersion, selectedIdx int
 	panelW := boxW - 6
 	innerPanel := innerPanelStyle.Width(panelW).Render(panelContent)
 
-	helpLine := HelpKeyStyle.Render("jk") + HelpDescStyle.Render(" nav") + "  " +
-		HelpKeyStyle.Render("Enter") + HelpDescStyle.Render(" view version") + "  " +
-		HelpKeyStyle.Render("esc") + HelpDescStyle.Render(" back")
-
-	body := title + "\n" + innerPanel + "\n" + helpLine
+	body := title + "\n" + innerPanel
 
 	return overlayBoxStyle.Width(boxW).Render(body)
 }

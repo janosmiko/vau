@@ -36,8 +36,40 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"?", "help"},
 			{"q", "quit"},
 		}
-	case model.ModeSecret, model.ModeSecretEdit, model.ModeVersionHistory, model.ModeHelp, model.ModeThemePicker:
-		// Help is embedded in the overlay, just show minimal bar
+	case model.ModeSecret:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"v", "toggle"},
+			{"V", "json"},
+			{"b", "b64"},
+			{"y", "copy"},
+			{"Y", "copy as"},
+			{"p", "paste"},
+			{"e", "edit"},
+			{"a", "add"},
+			{"H", "history"},
+			{"D", "del"},
+			{"esc", "close"},
+		}
+	case model.ModeSecretEdit:
+		bindings = []helpBinding{
+			{"Tab", "switch col"},
+			{"Enter", "save"},
+			{"Esc", "cancel"},
+		}
+	case model.ModeVersionHistory:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view version"},
+			{"esc", "back"},
+		}
+	case model.ModeThemePicker:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "select"},
+			{"esc", "cancel"},
+		}
+	case model.ModeHelp:
 		bindings = []helpBinding{}
 	case model.ModeConfirm:
 		bindings = []helpBinding{
@@ -162,7 +194,8 @@ func helpSections() []helpSection {
 				{"v / Tab", "Toggle value visibility"},
 				{"V", "Toggle JSON view"},
 				{"b", "Toggle base64 decode"},
-				{"y", "Copy value to clipboard"},
+				{"y", "Copy value (or JSON in JSON view)"},
+				{"Y", "Copy secret as... (j)son (y)aml (d)otenv"},
 				{"p", "Paste clipboard as value"},
 				{"e", "Edit value (inline / ext. editor in JSON view)"},
 				{"a", "Add new key-value pair (inline)"},

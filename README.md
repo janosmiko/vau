@@ -104,7 +104,7 @@ vau --version    # Print version information
 - **KV v1 and v2** - Auto-detects engine version per mount
 - **Secret popup** - View, edit, add, and delete key-value pairs inline
 - **External editor** - Edit secrets as JSON in your preferred editor (`e` in JSON view, `A` to create)
-- **Clipboard** - Copy/paste values to system clipboard (`y`/`p`)
+- **Clipboard** - Copy/paste values to system clipboard (`y`/`p`), copy entire secret as JSON, YAML, or dotenv (`Y`)
 - **Yank, cut, paste** - Move and copy secrets between paths
 - **Bulk operations** - Select multiple entries with `Space`, then delete
 - **Search** - Jump to first match (`/`)
@@ -199,7 +199,8 @@ Opened by pressing `Enter` on a secret (or `e` in explorer). Appears as a center
 | `v` / `Tab` | Toggle value visibility (hidden by default) |
 | `V` | Toggle JSON view |
 | `b` | Toggle base64 decode for selected value |
-| `y` | Copy selected value to system clipboard |
+| `y` | Copy selected value (or entire secret as JSON in JSON view) |
+| `Y` + `j`/`y`/`d` | Copy entire secret as JSON / YAML / dotenv |
 | `p` | Paste system clipboard as selected value |
 | `e` | Edit selected value inline, or open external editor in JSON view |
 | `a` | Add new key-value pair (inline) |
