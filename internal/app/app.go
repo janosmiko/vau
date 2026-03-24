@@ -2509,13 +2509,11 @@ func (m *Model) copySecretAsJSON() tea.Cmd {
 	return copyToSystemClipboard(string(data), "secret JSON")
 }
 
-func (m *Model) copySecretAsYAML() tea.Cmd {
-	if m.secret == nil {
-		return nil
-	}
+// formatSecretAsYAML renders secret key-value pairs as YAML text.
+func formatSecretAsYAML(secret *model.Secret) string {
 	var buf strings.Builder
-	for _, k := range m.secret.Keys {
-		v := m.secret.Data[k]
+	for _, k := range secret.Keys {
+		v := secret.Data[k]
 		// Quote values that contain special YAML characters or are empty
 		if v == "" || strings.ContainsAny(v, ":#{}[]&*!|>'\",\n") || v == "true" || v == "false" || v == "null" {
 			buf.WriteString(k + ": " + strconv.Quote(v) + "\n")
@@ -2523,16 +2521,21 @@ func (m *Model) copySecretAsYAML() tea.Cmd {
 			buf.WriteString(k + ": " + v + "\n")
 		}
 	}
-	return copyToSystemClipboard(buf.String(), "secret YAML")
+	return buf.String()
 }
 
-func (m *Model) copySecretAsDotenv() tea.Cmd {
+func (m *Model) copySecretAsYAML() tea.Cmd {
 	if m.secret == nil {
 		return nil
 	}
+	return copyToSystemClipboard(formatSecretAsYAML(m.secret), "secret YAML")
+}
+
+// formatSecretAsDotenv renders secret key-value pairs as dotenv text.
+func formatSecretAsDotenv(secret *model.Secret) string {
 	var buf strings.Builder
-	for _, k := range m.secret.Keys {
-		v := m.secret.Data[k]
+	for _, k := range secret.Keys {
+		v := secret.Data[k]
 		// Use double quotes for values containing special characters
 		if strings.ContainsAny(v, " \t\n\"'\\$`!#") || v == "" {
 			escaped := strings.ReplaceAll(v, "\\", "\\\\")
@@ -2543,7 +2546,14 @@ func (m *Model) copySecretAsDotenv() tea.Cmd {
 			buf.WriteString(k + "=" + v + "\n")
 		}
 	}
-	return copyToSystemClipboard(buf.String(), "secret dotenv")
+	return buf.String()
+}
+
+func (m *Model) copySecretAsDotenv() tea.Cmd {
+	if m.secret == nil {
+		return nil
+	}
+	return copyToSystemClipboard(formatSecretAsDotenv(m.secret), "secret dotenv")
 }
 
 // handleCopyFormat processes the second key after pressing Y in the secret popup.

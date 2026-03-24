@@ -301,6 +301,288 @@ func TestSaveAndLoadBookmarks(t *testing.T) {
 	assert.Equal(t, original, loaded)
 }
 
+// ---------------------------------------------------------------------------
+// configPath
+// ---------------------------------------------------------------------------
+
+func TestConfigPathReturnsYAML(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/tmp/test-cfg")
+	path, err := configPath()
+	require.NoError(t, err)
+	assert.Equal(t, "/tmp/test-cfg/vau/config.yaml", path)
+	assert.True(t, filepath.Ext(path) == ".yaml")
+}
+
+func TestConfigPathDefaultsWithoutXDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	path, err := configPath()
+	require.NoError(t, err)
+
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, filepath.Join(home, ".config", "vau", "config.yaml"), path)
+}
+
+// ---------------------------------------------------------------------------
+// mustConfigBase
+// ---------------------------------------------------------------------------
+
+func TestMustConfigBaseRespectsXDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "/custom/config")
+	assert.Equal(t, "/custom/config", mustConfigBase())
+}
+
+func TestMustConfigBaseDefaultsWithoutXDG(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, filepath.Join(home, ".config"), mustConfigBase())
+}
+
+// ---------------------------------------------------------------------------
+// Load
+// ---------------------------------------------------------------------------
+
+func TestLoadValidConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDirPath := filepath.Join(tmpDir, "vau")
+	require.NoError(t, os.MkdirAll(configDirPath, 0o755))
+
+	configContent := []byte(`editor: nvim
+colorscheme: tokyonight
+theme:
+  primary: "#aabbcc"
+bookmarks:
+  - name: b1
+    mount: secret
+    path: a/b
+keybindings:
+  quit: Q
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(configDirPath, "config.yaml"), configContent, 0o644))
+
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "nvim", cfg.Editor)
+	assert.Equal(t, "tokyonight", cfg.Colorscheme)
+	assert.Equal(t, "#aabbcc", cfg.Theme.Primary)
+	require.Len(t, cfg.Bookmarks, 1)
+	assert.Equal(t, "b1", cfg.Bookmarks[0].Name)
+	assert.Equal(t, "Q", cfg.Keybindings["quit"])
+}
+
+func TestLoadNonExistentFileReturnsDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Empty(t, cfg.Editor)
+	assert.Empty(t, cfg.Colorscheme)
+	assert.Nil(t, cfg.Bookmarks)
+	assert.Nil(t, cfg.Keybindings)
+}
+
+func TestLoadInvalidYAMLReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDirPath := filepath.Join(tmpDir, "vau")
+	require.NoError(t, os.MkdirAll(configDirPath, 0o755))
+
+	badContent := []byte("editor: [invalid yaml\n  - broken")
+	require.NoError(t, os.WriteFile(filepath.Join(configDirPath, "config.yaml"), badContent, 0o644))
+
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfg, err := Load()
+	assert.Error(t, err)
+	assert.Nil(t, cfg)
+}
+
+func TestLoadEmptyFileReturnsDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDirPath := filepath.Join(tmpDir, "vau")
+	require.NoError(t, os.MkdirAll(configDirPath, 0o755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(configDirPath, "config.yaml"), []byte(""), 0o644))
+
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Empty(t, cfg.Editor)
+}
+
+func TestLoadReadPermissionError(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDirPath := filepath.Join(tmpDir, "vau")
+	require.NoError(t, os.MkdirAll(configDirPath, 0o755))
+
+	configFile := filepath.Join(configDirPath, "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("editor: vim"), 0o600))
+	// Remove read permissions.
+	require.NoError(t, os.Chmod(configFile, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(configFile, 0o600) })
+
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfg, err := Load()
+	assert.Error(t, err)
+	assert.Nil(t, cfg)
+}
+
+// ---------------------------------------------------------------------------
+// LoadBookmarks edge cases
+// ---------------------------------------------------------------------------
+
+func TestLoadBookmarksCorruptYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	stateVauDir := filepath.Join(tmpDir, "state", "vau")
+	require.NoError(t, os.MkdirAll(stateVauDir, 0o755))
+
+	badContent := []byte("- name: [broken\n  invalid yaml here")
+	require.NoError(t, os.WriteFile(filepath.Join(stateVauDir, "bookmarks.yaml"), badContent, 0o644))
+
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+
+	bookmarks, err := LoadBookmarks()
+	assert.Error(t, err)
+	assert.Nil(t, bookmarks)
+}
+
+func TestLoadBookmarksEmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	stateVauDir := filepath.Join(tmpDir, "state", "vau")
+	require.NoError(t, os.MkdirAll(stateVauDir, 0o755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(stateVauDir, "bookmarks.yaml"), []byte(""), 0o644))
+
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+
+	bookmarks, err := LoadBookmarks()
+	require.NoError(t, err)
+	assert.Nil(t, bookmarks)
+}
+
+func TestLoadBookmarksEmptyArray(t *testing.T) {
+	tmpDir := t.TempDir()
+	stateVauDir := filepath.Join(tmpDir, "state", "vau")
+	require.NoError(t, os.MkdirAll(stateVauDir, 0o755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(stateVauDir, "bookmarks.yaml"), []byte("[]"), 0o644))
+
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+
+	bookmarks, err := LoadBookmarks()
+	require.NoError(t, err)
+	assert.Empty(t, bookmarks)
+}
+
+func TestLoadBookmarksReadPermissionError(t *testing.T) {
+	tmpDir := t.TempDir()
+	stateVauDir := filepath.Join(tmpDir, "state", "vau")
+	require.NoError(t, os.MkdirAll(stateVauDir, 0o755))
+
+	bmFile := filepath.Join(stateVauDir, "bookmarks.yaml")
+	require.NoError(t, os.WriteFile(bmFile, []byte("- name: x\n  mount: s\n  path: p\n"), 0o600))
+	require.NoError(t, os.Chmod(bmFile, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(bmFile, 0o600) })
+
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+
+	bookmarks, err := LoadBookmarks()
+	assert.Error(t, err)
+	assert.Nil(t, bookmarks)
+}
+
+// ---------------------------------------------------------------------------
+// SaveBookmarks edge cases
+// ---------------------------------------------------------------------------
+
+func TestSaveBookmarksNil(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+
+	require.NoError(t, SaveBookmarks(nil))
+
+	// Verify the saved file can be loaded back.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+	loaded, err := LoadBookmarks()
+	require.NoError(t, err)
+	assert.Empty(t, loaded)
+}
+
+func TestSaveBookmarksEmptySlice(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+
+	require.NoError(t, SaveBookmarks([]Bookmark{}))
+
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+	loaded, err := LoadBookmarks()
+	require.NoError(t, err)
+	assert.Empty(t, loaded)
+}
+
+func TestSaveBookmarksWithSlotField(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+
+	original := []Bookmark{
+		{Name: "slotted", Mount: "kv", Path: "a/b", Slot: "a"},
+		{Name: "unslotted", Mount: "secret", Path: "c/d"},
+	}
+	require.NoError(t, SaveBookmarks(original))
+
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+	loaded, err := LoadBookmarks()
+	require.NoError(t, err)
+	require.Len(t, loaded, 2)
+	assert.Equal(t, "a", loaded[0].Slot)
+	assert.Empty(t, loaded[1].Slot)
+}
+
+func TestSaveBookmarksCreatesDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+
+	// state/vau/ does not exist yet -- SaveBookmarks should create it.
+	require.NoError(t, SaveBookmarks([]Bookmark{
+		{Name: "test", Mount: "m", Path: "p"},
+	}))
+
+	// Verify the directory was created.
+	info, err := os.Stat(filepath.Join(tmpDir, "state", "vau"))
+	require.NoError(t, err)
+	assert.True(t, info.IsDir())
+}
+
+func TestSaveBookmarksOverwritesExisting(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(tmpDir, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpDir, "config"))
+
+	first := []Bookmark{{Name: "first", Mount: "s", Path: "a"}}
+	require.NoError(t, SaveBookmarks(first))
+
+	second := []Bookmark{{Name: "second", Mount: "kv", Path: "b"}}
+	require.NoError(t, SaveBookmarks(second))
+
+	loaded, err := LoadBookmarks()
+	require.NoError(t, err)
+	require.Len(t, loaded, 1)
+	assert.Equal(t, "second", loaded[0].Name)
+}
+
+// ---------------------------------------------------------------------------
+// Original round-trip test
+// ---------------------------------------------------------------------------
+
 func TestConfigYAMLRoundTrip(t *testing.T) {
 	original := Config{
 		Editor:      "code",
