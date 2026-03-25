@@ -306,11 +306,15 @@ func RenderVersionHistoryOverlay(versions []model.SecretVersion, selectedIdx int
 
 	for i := start; i < end; i++ {
 		v := versions[i]
-		status := "current"
+		var status string
 		if v.Destroyed {
 			status = "destroyed"
 		} else if v.DeletionTime != "" && v.DeletionTime != "0001-01-01T00:00:00Z" {
 			status = "deleted"
+		} else if i == 0 {
+			status = "current"
+		} else {
+			status = "superseded"
 		}
 		// Truncate created time to reasonable length
 		created := v.CreatedTime

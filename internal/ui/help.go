@@ -30,6 +30,7 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"r", "rename"},
 			{"D", "del"},
 			{"y/p/x", "yank/paste/cut"},
+			{"Y", "copy as"},
 			{"u", "undo"},
 			{"m+'", "mark/jump"},
 			{"T", "theme"},
@@ -61,6 +62,8 @@ func HelpBar(mode model.ViewMode, width int) string {
 		bindings = []helpBinding{
 			{"jk", "nav"},
 			{"Enter", "view version"},
+			{"D", "destroy ver"},
+			{"Ctrl+X", "clear old"},
 			{"esc", "back"},
 		}
 	case model.ModeThemePicker:
@@ -158,8 +161,9 @@ func helpSections() []helpSection {
 				{"a", "Create new secret (inline editor)"},
 				{"A", "Create new secret (external editor)"},
 				{"r", "Rename / move secret"},
-				{"y", "Yank (copy) secret data"},
-				{"p", "Paste yanked secret"},
+				{"y", "Yank (copy) secret or directory (recursive)"},
+				{"Y", "Copy secret as... (j)son (y)aml (d)otenv"},
+				{"p", "Paste yanked items (preserves version history)"},
 				{"x", "Cut (yank for move)"},
 				{"D", "Delete (with confirmation)"},
 				{"u", "Undo last action"},
@@ -206,6 +210,16 @@ func helpSections() []helpSection {
 				{"Ctrl+F", "Full-page scroll down"},
 				{"Ctrl+B", "Full-page scroll up"},
 				{"Esc / q / h", "Close popup"},
+			},
+		},
+		{
+			title: "Version History (H)",
+			bindings: []helpBinding{
+				{"j / k", "Navigate versions"},
+				{"Enter", "View version details"},
+				{"D", "Destroy selected version (permanent)"},
+				{"Ctrl+X", "Destroy all old versions (keep latest)"},
+				{"Esc", "Close version history"},
 			},
 		},
 		{

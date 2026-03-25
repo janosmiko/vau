@@ -161,6 +161,7 @@ type Model struct {
 	// Clipboard: stores yanked secret data for single or bulk operations
 	yankedSecrets []*model.Secret // yanked secrets (one or more)
 	yankPaths     []string        // paths of yanked items (for directory operations)
+	yankMount     string          // mount path at yank time (for cross-mount detection)
 	yankIsCut     bool            // true if yanked via cut (x) — paste will delete source
 	yankIsDir     bool            // true if yanked items include directories
 
@@ -200,6 +201,7 @@ type Model struct {
 
 	// Copy format pending (Y + j/y/d for json/yaml/dotenv)
 	copyFormatPending bool
+	copySecret        *model.Secret // secret to copy when format key arrives
 
 	// Theme picker
 	themeEntries      []ui.ThemeEntry // grouped theme list with headers
@@ -230,7 +232,7 @@ func NewModel(client *vault.Client, cfg *config.Config, version string) *Model {
 			if name == "" {
 				name = cb.Mount + "/" + cb.Path
 			}
-			bookmarks = append(bookmarks, config.Bookmark{Name: name, Mount: cb.Mount, Path: cb.Path})
+			bookmarks = append(bookmarks, config.Bookmark{Name: name, Mount: cb.Mount, Path: cb.Path, Slot: cb.Slot})
 		}
 	}
 
@@ -1287,6 +1289,17 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.markPending = false
 		return m.handleMarkSave(key)
 	}
+
+	// Clear stale mark overwrite confirmation when the user does any other action
+	if m.lastMarkAttempt != "" {
+		m.lastMarkAttempt = ""
+	}
+
+	// Handle copy format pending (Y + j/y/d)
+	if m.copyFormatPending {
+		m.copyFormatPending = false
+		return m.handleCopyFormat(key)
+	}
 	switch {
 	case matchKey(key, m.keys.Quit):
 		return m, tea.Quit
@@ -1415,29 +1428,43 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.selected) > 0 {
 			entries := m.selectedEntries()
 			m.status = fmt.Sprintf("Yanking %d items...", len(entries))
+			m.yankMount = m.client.Mount()
 			m.selected = make(map[int]bool)
 			return m, m.bulkYankSecrets(entries, false)
 		}
 		entry := m.selectedEntry()
-		if entry != nil && !entry.IsDir {
+		if entry != nil {
+			if entry.IsDir {
+				path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
+				m.yankIsCut = false
+				m.yankIsDir = true
+				m.yankPaths = []string{path}
+				m.yankMount = m.client.Mount()
+				m.yankedSecrets = nil
+				m.status = "Yanked (directory): " + entry.Name
+				return m, nil
+			}
 			path := m.currentPath() + entry.Name
 			m.yankIsCut = false
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
+			m.yankMount = m.client.Mount()
 			m.status = "Yanking " + entry.Name + "..."
 			return m, m.yankSecret(path)
 		}
 
 	case matchKey(key, m.keys.Paste):
-		if m.yankIsDir && m.yankIsCut {
+		if m.yankIsDir {
+			if m.yankMount != "" && m.yankMount != m.client.Mount() {
+				m.errMsg = "Cannot paste across different mounts"
+				return m, nil
+			}
 			cmd := m.pasteSecrets()
-			m.yankIsCut = false
-			m.yankIsDir = false
+			if m.yankIsCut {
+				m.yankIsCut = false
+				m.yankIsDir = false
+			}
 			return m, cmd
-		}
-		if m.yankIsDir && !m.yankIsCut {
-			m.errMsg = "Cannot yank-paste directories, use cut (x) instead"
-			return m, nil
 		}
 		if len(m.yankedSecrets) > 0 {
 			cmd := m.pasteSecrets()
@@ -1464,6 +1491,16 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.previewMode = model.PreviewJSON
 			}
+		}
+
+	case key == "Y":
+		// Copy secret as JSON/YAML/dotenv from explorer
+		entry := m.selectedEntry()
+		if entry != nil && !entry.IsDir && m.previewSecret != nil {
+			m.copySecret = m.previewSecret
+			m.copyFormatPending = true
+			m.status = "Copy as: (j)son  (y)aml  (d)otenv"
+			return m, nil
 		}
 
 	case matchKey(key, m.keys.HalfDown):
@@ -1546,6 +1583,7 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.selected) > 0 {
 			entries := m.selectedEntries()
 			m.status = fmt.Sprintf("Cutting %d items...", len(entries))
+			m.yankMount = m.client.Mount()
 			m.selected = make(map[int]bool)
 			return m, m.bulkYankSecrets(entries, true)
 		}
@@ -1556,6 +1594,7 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.yankIsCut = true
 				m.yankIsDir = true
 				m.yankPaths = []string{path}
+				m.yankMount = m.client.Mount()
 				m.yankedSecrets = nil
 				m.status = "Cut (directory): " + entry.Name
 				return m, nil
@@ -1564,6 +1603,7 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.yankIsCut = true
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
+			m.yankMount = m.client.Mount()
 			m.status = "Cutting " + entry.Name + "..."
 			return m, m.yankSecret(path)
 		}
@@ -2043,6 +2083,7 @@ func (m *Model) handleSecretKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "Y":
 		// Copy entire secret — choose format
 		if m.secret != nil {
+			m.copySecret = m.secret
 			m.copyFormatPending = true
 			m.status = "Copy as: (j)son  (y)aml  (d)otenv"
 			return m, nil
@@ -2556,22 +2597,29 @@ func (m *Model) copySecretAsDotenv() tea.Cmd {
 	return copyToSystemClipboard(formatSecretAsDotenv(m.secret), "secret dotenv")
 }
 
-// handleCopyFormat processes the second key after pressing Y in the secret popup.
+// handleCopyFormat processes the second key after pressing Y (copy-as format).
+// Works in both secret popup (m.secret) and explorer (m.previewSecret).
 func (m *Model) handleCopyFormat(key string) (tea.Model, tea.Cmd) {
-	if m.secret == nil {
+	s := m.copySecret
+	m.copySecret = nil
+	if s == nil {
 		m.status = ""
 		return m, nil
 	}
 	switch key {
 	case "j":
 		m.status = ""
-		return m, m.copySecretAsJSON()
+		data, err := json.Marshal(s.Data)
+		if err != nil {
+			return m, func() tea.Msg { return errorMsg("json: " + err.Error()) }
+		}
+		return m, copyToSystemClipboard(string(data), "secret JSON")
 	case "y":
 		m.status = ""
-		return m, m.copySecretAsYAML()
+		return m, copyToSystemClipboard(formatSecretAsYAML(s), "secret YAML")
 	case "d":
 		m.status = ""
-		return m, m.copySecretAsDotenv()
+		return m, copyToSystemClipboard(formatSecretAsDotenv(s), "secret dotenv")
 	default:
 		m.status = ""
 		return m, nil
@@ -3313,20 +3361,43 @@ func (m *Model) pasteSecrets() tea.Cmd {
 	basePath := m.currentPath()
 
 	return func() tea.Msg {
-		// Directory cut+paste: use MoveRecursive for each directory
-		if isDir && isCut && len(yankPaths) > 0 {
-			totalMoved := 0
+		// Directory operations (both cut and copy).
+		if isDir && len(yankPaths) > 0 {
+			totalCount := 0
 			for _, yp := range yankPaths {
 				parts := strings.Split(strings.TrimSuffix(yp, "/"), "/")
 				name := parts[len(parts)-1]
 				dst := basePath + name
-				count, err := m.client.MoveRecursive(yp, dst)
-				if err != nil {
-					return errorMsg(fmt.Sprintf("moved %d items, then error: %v", totalMoved, err))
+
+				// If destination directory already exists, append _1, _2, etc.
+				if entries, err := m.client.List(dst); err == nil && entries != nil {
+					for i := 1; ; i++ {
+						candidate := basePath + fmt.Sprintf("%s_%d", name, i)
+						if entries, err := m.client.List(candidate); err != nil || entries == nil {
+							dst = candidate
+							break
+						}
+					}
 				}
-				totalMoved += count
+
+				if isCut {
+					count, err := m.client.MoveRecursive(yp, dst)
+					if err != nil {
+						return errorMsg(fmt.Sprintf("moved %d items, then error: %v", totalCount, err))
+					}
+					totalCount += count
+				} else {
+					count, err := m.client.CopyRecursiveWithHistory(yp, dst)
+					if err != nil {
+						return errorMsg(fmt.Sprintf("copied %d items, then error: %v", totalCount, err))
+					}
+					totalCount += count
+				}
 			}
-			return statusMsg(fmt.Sprintf("Moved %d items", totalMoved))
+			if isCut {
+				return statusMsg(fmt.Sprintf("Moved %d items", totalCount))
+			}
+			return statusMsg(fmt.Sprintf("Copied %d items (with history)", totalCount))
 		}
 
 		if len(yankedSecrets) == 0 {
@@ -3350,7 +3421,8 @@ func (m *Model) pasteSecrets() tea.Cmd {
 				}
 			}
 
-			if err := m.client.Write(dst, yanked.Data); err != nil {
+			// Use CopyWithHistory to preserve version history.
+			if err := m.client.CopyWithHistory(yanked.Path, dst); err != nil {
 				return errorMsg(fmt.Sprintf("pasted %d items, then error: %v", pastedCount, err))
 			}
 
@@ -3718,8 +3790,69 @@ func (m *Model) handleVersionHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return versionDetailMsg{version: ver, secret: secret, err: err}
 			}
 		}
+	case "D":
+		// Destroy selected version.
+		if len(m.versionHistory) > 0 && m.versionCursor < len(m.versionHistory) {
+			sv := m.versionHistory[m.versionCursor]
+			if sv.Destroyed {
+				m.status = fmt.Sprintf("Version %s is already destroyed", sv.Version)
+				return m, nil
+			}
+			ver, _ := strconv.Atoi(sv.Version)
+			path := m.versionPath
+			m.confirmMsg = fmt.Sprintf("Permanently destroy version %s?", sv.Version)
+			m.prevConfirmMode = model.ModeVersionHistory
+			m.confirmAction = func() tea.Cmd {
+				return m.destroyVersion(path, ver)
+			}
+			m.enterConfirmMode()
+			return m, nil
+		}
+	case "ctrl+x":
+		// Destroy all old versions, keep latest.
+		if len(m.versionHistory) > 1 {
+			path := m.versionPath
+			m.confirmMsg = fmt.Sprintf("Destroy all old versions of %s? (keeps latest)", path)
+			m.prevConfirmMode = model.ModeVersionHistory
+			m.confirmAction = func() tea.Cmd {
+				return m.destroyOldVersions(path)
+			}
+			m.enterConfirmMode()
+			return m, nil
+		}
+		m.status = "Only one version exists"
+		return m, nil
 	}
 	return m, nil
+}
+
+func (m *Model) destroyVersion(path string, version int) tea.Cmd {
+	return func() tea.Msg {
+		if err := m.client.DestroyVersions(path, []int{version}); err != nil {
+			return errorMsg(fmt.Sprintf("destroy version %d: %v", version, err))
+		}
+		// Reload version history.
+		versions, err := m.client.ReadVersionMetadata(path)
+		if err != nil {
+			return statusMsg(fmt.Sprintf("Destroyed version %d (reload failed: %v)", version, err))
+		}
+		return versionHistoryMsg{path: path, versions: versions}
+	}
+}
+
+func (m *Model) destroyOldVersions(path string) tea.Cmd {
+	return func() tea.Msg {
+		count, err := m.client.DestroyOldVersions(path)
+		if err != nil {
+			return errorMsg(fmt.Sprintf("destroy old versions: %v", err))
+		}
+		// Reload version history.
+		versions, err := m.client.ReadVersionMetadata(path)
+		if err != nil {
+			return statusMsg(fmt.Sprintf("Destroyed %d old versions (reload failed: %v)", count, err))
+		}
+		return versionHistoryMsg{path: path, versions: versions}
+	}
 }
 
 // --- Undo/redo execution ---

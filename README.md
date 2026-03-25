@@ -105,7 +105,7 @@ vau --version    # Print version information
 - **Secret popup** - View, edit, add, and delete key-value pairs inline
 - **External editor** - Edit secrets as JSON in your preferred editor (`e` in JSON view, `A` to create)
 - **Clipboard** - Copy/paste values to system clipboard (`y`/`p`), copy entire secret as JSON, YAML, or dotenv (`Y`)
-- **Yank, cut, paste** - Move and copy secrets between paths
+- **Yank, cut, paste** - Move and copy secrets and directories between paths (recursive, preserves version history)
 - **Bulk operations** - Select multiple entries with `Space`, then delete
 - **Search** - Jump to first match (`/`)
 - **Filter** - Hide non-matching entries (`f`)
@@ -113,7 +113,7 @@ vau --version    # Print version information
 - **Undo / redo** - Reverse destructive actions (`u` / `Ctrl+R`)
 - **Tabs** - Multiple tabs with independent navigation state (`t` to create, `[`/`]` to switch)
 - **Marks** - Save and jump to frequently used paths (`m` + slot key to set, `'` to browse and quick-jump)
-- **Version history** - Browse secret versions for KV v2 mounts (`H`)
+- **Version history** - Browse and manage secret versions for KV v2 mounts (`H`, `D` to destroy, `Ctrl+X` to clear old)
 - **Base64 decode** - Toggle decoded view for base64-encoded values (`b` in secret popup)
 - **Mouse support** - Click entries, tabs, and scroll with the mouse wheel
 - **Built-in colorschemes** - 16 themes including Tokyo Night, Kanagawa, Nord, Gruvbox, Dracula, Catppuccin, Bluloco (`T` to pick at runtime)
@@ -160,8 +160,9 @@ vau --version    # Print version information
 | `a` | Create new secret (inline editor) |
 | `A` | Create new secret (external editor) |
 | `r` | Rename / move secret or directory |
-| `y` | Yank (copy) secret data |
-| `p` | Paste yanked secret to current directory |
+| `y` | Yank (copy) secret or directory (recursive) |
+| `Y` + `j`/`y`/`d` | Copy secret as JSON / YAML / dotenv |
+| `p` | Paste yanked items (preserves version history) |
 | `x` | Cut (yank for move - paste will delete source) |
 | `D` | Delete secret/directory (recursive, with confirmation) |
 | `u` | Undo last action |
@@ -211,6 +212,16 @@ Opened by pressing `Enter` on a secret (or `e` in explorer). Appears as a center
 | `Ctrl+F` | Full-page scroll down |
 | `Ctrl+B` | Full-page scroll up |
 | `Esc` / `q` / `h` | Back to explorer |
+
+### Version History
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate versions |
+| `Enter` | View version details |
+| `D` | Destroy selected version (permanent, with confirmation) |
+| `Ctrl+X` | Destroy all old versions, keep latest (with confirmation) |
+| `Esc` | Close version history |
 
 ### Inline Edit (Secret Popup)
 

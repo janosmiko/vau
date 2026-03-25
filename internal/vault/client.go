@@ -431,35 +431,126 @@ func (c *Client) ReadVersion(path string, version int) (*model.Secret, error) {
 	return &model.Secret{Path: path, Data: data, Keys: keys}, nil
 }
 
-// Move copies a secret from src to dst and deletes the source.
-func (c *Client) Move(src, dst string) error {
-	secret, err := c.Read(src)
+// DestroyVersions permanently destroys specific versions of a secret (KV v2 only).
+func (c *Client) DestroyVersions(path string, versions []int) error {
+	if c.getMountVersion(c.mount) == 1 {
+		return ErrKV1NotSupported
+	}
+	apiPath := fmt.Sprintf("%s/destroy/%s", c.mount, path)
+	versionStrs := make([]interface{}, len(versions))
+	for i, v := range versions {
+		versionStrs[i] = v
+	}
+	_, err := c.raw.Logical().Write(apiPath, map[string]interface{}{
+		"versions": versionStrs,
+	})
 	if err != nil {
-		return fmt.Errorf("reading source %s: %w", src, err)
-	}
-	if err := c.Write(dst, secret.Data); err != nil {
-		return fmt.Errorf("writing destination %s: %w", dst, err)
-	}
-	if err := c.Delete(src); err != nil {
-		return fmt.Errorf("deleting source %s: %w", src, err)
+		return fmt.Errorf("destroying versions of %s: %w", path, err)
 	}
 	return nil
 }
 
-// MoveRecursive moves a secret or directory (and all its children) from src to dst.
-// Returns the number of secrets moved.
-func (c *Client) MoveRecursive(src, dst string) (int, error) {
-	// Try to list children (it's a directory).
+// DestroyOldVersions destroys all versions except the latest for a secret (KV v2 only).
+// Returns the number of versions destroyed.
+func (c *Client) DestroyOldVersions(path string) (int, error) {
+	if c.getMountVersion(c.mount) == 1 {
+		return 0, ErrKV1NotSupported
+	}
+	versions, err := c.ReadVersionMetadata(path)
+	if err != nil {
+		return 0, err
+	}
+	if len(versions) <= 1 {
+		return 0, nil
+	}
+
+	// versions is sorted newest-first; skip the first (latest).
+	var toDestroy []int
+	for _, v := range versions[1:] {
+		if v.Destroyed {
+			continue
+		}
+		vNum, _ := strconv.Atoi(v.Version)
+		toDestroy = append(toDestroy, vNum)
+	}
+	if len(toDestroy) == 0 {
+		return 0, nil
+	}
+
+	if err := c.DestroyVersions(path, toDestroy); err != nil {
+		return 0, err
+	}
+	return len(toDestroy), nil
+}
+
+// CopyWithHistory copies a secret from src to dst, preserving all KV v2 versions.
+// For KV v1, copies only the current data (no version history exists).
+func (c *Client) CopyWithHistory(src, dst string) error {
+	if c.getMountVersion(c.mount) == 1 {
+		secret, err := c.Read(src)
+		if err != nil {
+			return fmt.Errorf("reading source %s: %w", src, err)
+		}
+		return c.Write(dst, secret.Data)
+	}
+
+	// KV v2: read all versions and replay them oldest-first.
+	versions, err := c.ReadVersionMetadata(src)
+	if err != nil {
+		// Fall back to single-version copy if metadata is unavailable.
+		secret, err := c.Read(src)
+		if err != nil {
+			return fmt.Errorf("reading source %s: %w", src, err)
+		}
+		return c.Write(dst, secret.Data)
+	}
+
+	// Sort oldest-first (ReadVersionMetadata returns newest-first).
+	sort.Slice(versions, func(i, j int) bool {
+		vi, _ := strconv.Atoi(versions[i].Version)
+		vj, _ := strconv.Atoi(versions[j].Version)
+		return vi < vj
+	})
+
+	written := 0
+	for _, v := range versions {
+		if v.Destroyed || (v.DeletionTime != "" && v.DeletionTime != "0001-01-01T00:00:00Z") {
+			continue
+		}
+		vNum, _ := strconv.Atoi(v.Version)
+		secret, err := c.ReadVersion(src, vNum)
+		if err != nil {
+			continue // skip unreadable versions
+		}
+		if err := c.Write(dst, secret.Data); err != nil {
+			return fmt.Errorf("writing version %d to %s: %w", vNum, dst, err)
+		}
+		written++
+	}
+
+	// If no versions were written (all destroyed/deleted), copy latest as fallback.
+	if written == 0 {
+		secret, err := c.Read(src)
+		if err != nil {
+			return fmt.Errorf("reading source %s: %w", src, err)
+		}
+		return c.Write(dst, secret.Data)
+	}
+	return nil
+}
+
+// CopyRecursiveWithHistory copies a secret or directory recursively, preserving version history.
+// Returns the number of secrets copied.
+func (c *Client) CopyRecursiveWithHistory(src, dst string) (int, error) {
 	entries, err := c.List(src)
 	if err != nil || entries == nil {
-		// Not a directory — move as a single secret.
-		if err := c.Move(src, dst); err != nil {
+		// Single secret.
+		if err := c.CopyWithHistory(src, dst); err != nil {
 			return 0, err
 		}
 		return 1, nil
 	}
 
-	// Ensure both paths have trailing slash for child concatenation.
 	srcDir := src
 	if !strings.HasSuffix(srcDir, "/") {
 		srcDir += "/"
@@ -474,20 +565,44 @@ func (c *Client) MoveRecursive(src, dst string) (int, error) {
 		childSrc := srcDir + e.Name
 		childDst := dstDir + e.Name
 		if e.IsDir {
-			n, err := c.MoveRecursive(
+			n, err := c.CopyRecursiveWithHistory(
 				strings.TrimSuffix(childSrc, "/"),
 				strings.TrimSuffix(childDst, "/"),
 			)
 			if err != nil {
-				return count, fmt.Errorf("moving %s: %w", childSrc, err)
+				return count, fmt.Errorf("copying %s: %w", childSrc, err)
 			}
 			count += n
 		} else {
-			if err := c.Move(childSrc, childDst); err != nil {
-				return count, fmt.Errorf("moving %s: %w", childSrc, err)
+			if err := c.CopyWithHistory(childSrc, childDst); err != nil {
+				return count, fmt.Errorf("copying %s: %w", childSrc, err)
 			}
 			count++
 		}
 	}
 	return count, nil
+}
+
+// Move copies a secret from src to dst (preserving version history) and deletes the source.
+func (c *Client) Move(src, dst string) error {
+	if err := c.CopyWithHistory(src, dst); err != nil {
+		return fmt.Errorf("copying %s to %s: %w", src, dst, err)
+	}
+	if err := c.Delete(src); err != nil {
+		return fmt.Errorf("deleting source %s: %w", src, err)
+	}
+	return nil
+}
+
+// MoveRecursive moves a secret or directory (and all its children) from src to dst.
+// Preserves version history. Returns the number of secrets moved.
+func (c *Client) MoveRecursive(src, dst string) (int, error) {
+	n, err := c.CopyRecursiveWithHistory(src, dst)
+	if err != nil {
+		return n, err
+	}
+	if _, err := c.DeleteRecursive(src); err != nil {
+		return n, fmt.Errorf("deleting source %s after copy: %w", src, err)
+	}
+	return n, nil
 }

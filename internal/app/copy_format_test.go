@@ -66,74 +66,75 @@ func TestCopySecretAsJSON(t *testing.T) {
 }
 
 func TestHandleCopyFormatJSON(t *testing.T) {
-	m := &Model{
-		secret: &model.Secret{
-			Path: "secret/test",
-			Keys: []string{"k"},
-			Data: map[string]string{"k": "v"},
-		},
-	}
+	s := &model.Secret{Path: "secret/test", Keys: []string{"k"}, Data: map[string]string{"k": "v"}}
+	m := &Model{copySecret: s}
 	_, cmd := m.handleCopyFormat("j")
 	assert.NotNil(t, cmd)
 	assert.Empty(t, m.status)
+	assert.Nil(t, m.copySecret)
 }
 
 func TestHandleCopyFormatYAML(t *testing.T) {
-	m := &Model{
-		secret: &model.Secret{
-			Path: "secret/test",
-			Keys: []string{"k"},
-			Data: map[string]string{"k": "v"},
-		},
-	}
+	s := &model.Secret{Path: "secret/test", Keys: []string{"k"}, Data: map[string]string{"k": "v"}}
+	m := &Model{copySecret: s}
 	_, cmd := m.handleCopyFormat("y")
 	assert.NotNil(t, cmd)
 	assert.Empty(t, m.status)
+	assert.Nil(t, m.copySecret)
 }
 
 func TestHandleCopyFormatDotenv(t *testing.T) {
-	m := &Model{
-		secret: &model.Secret{
-			Path: "secret/test",
-			Keys: []string{"k"},
-			Data: map[string]string{"k": "v"},
-		},
-	}
+	s := &model.Secret{Path: "secret/test", Keys: []string{"k"}, Data: map[string]string{"k": "v"}}
+	m := &Model{copySecret: s}
 	_, cmd := m.handleCopyFormat("d")
 	assert.NotNil(t, cmd)
 	assert.Empty(t, m.status)
+	assert.Nil(t, m.copySecret)
 }
 
 func TestHandleCopyFormatEscape(t *testing.T) {
-	m := &Model{
-		secret: &model.Secret{
-			Path: "secret/test",
-			Keys: []string{"k"},
-			Data: map[string]string{"k": "v"},
-		},
-		status: "Copy as: ...",
-	}
+	s := &model.Secret{Path: "secret/test", Keys: []string{"k"}, Data: map[string]string{"k": "v"}}
+	m := &Model{copySecret: s, status: "Copy as: ..."}
 	_, cmd := m.handleCopyFormat("esc")
 	assert.Nil(t, cmd)
 	assert.Empty(t, m.status)
+	assert.Nil(t, m.copySecret)
 }
 
 func TestHandleCopyFormatInvalidKey(t *testing.T) {
-	m := &Model{
-		secret: &model.Secret{
-			Path: "secret/test",
-			Keys: []string{"k"},
-			Data: map[string]string{"k": "v"},
-		},
-		status: "Copy as: ...",
-	}
+	s := &model.Secret{Path: "secret/test", Keys: []string{"k"}, Data: map[string]string{"k": "v"}}
+	m := &Model{copySecret: s, status: "Copy as: ..."}
 	_, cmd := m.handleCopyFormat("x")
 	assert.Nil(t, cmd)
 	assert.Empty(t, m.status)
+	assert.Nil(t, m.copySecret)
 }
 
 func TestHandleCopyFormatNilSecret(t *testing.T) {
-	m := &Model{secret: nil}
+	m := &Model{copySecret: nil}
 	_, cmd := m.handleCopyFormat("j")
 	assert.Nil(t, cmd)
+}
+
+func TestHandleCopyFormatFromExplorer(t *testing.T) {
+	s := &model.Secret{
+		Path: "secret/test",
+		Keys: []string{"DB_HOST", "DB_PASS"},
+		Data: map[string]string{"DB_HOST": "localhost", "DB_PASS": "s3cret"},
+	}
+	m := &Model{copySecret: s}
+
+	// JSON format
+	_, cmd := m.handleCopyFormat("j")
+	assert.NotNil(t, cmd)
+
+	// YAML format
+	m.copySecret = s
+	_, cmd = m.handleCopyFormat("y")
+	assert.NotNil(t, cmd)
+
+	// Dotenv format
+	m.copySecret = s
+	_, cmd = m.handleCopyFormat("d")
+	assert.NotNil(t, cmd)
 }
