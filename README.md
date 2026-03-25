@@ -119,6 +119,7 @@ vau --version    # Print version information
 - **Built-in colorschemes** - 16 themes including Tokyo Night, Kanagawa, Nord, Gruvbox, Dracula, Catppuccin, Bluloco (`T` to pick at runtime)
 - **Configurable** - Custom editor, colorscheme, and keybindings via `~/.config/vau/config.yaml`
 - **Cursor memory** - Remembers cursor position per directory (yazi-style)
+- **Progress tracking** - Long-running operations (recursive copy/move/delete) show live progress with `Ctrl+C` to cancel
 - **Destructive action safety** - Delete operations require typing `DELETE` to confirm
 - **Help screen** - Scrollable, searchable keybinding reference (`?`)
 

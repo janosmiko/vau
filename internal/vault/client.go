@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,10 @@ import (
 
 	vaultapi "github.com/hashicorp/vault/api"
 )
+
+// ProgressCallback is called during recursive operations to report progress.
+// current is the number of items processed so far, total is the estimated total (0 if unknown).
+type ProgressCallback func(current, total int)
 
 // ErrKV1NotSupported is returned when a KV v2-only operation is attempted on a KV v1 mount.
 var ErrKV1NotSupported = fmt.Errorf("operation not supported for KV v1 engine")
@@ -597,11 +602,165 @@ func (c *Client) Move(src, dst string) error {
 // MoveRecursive moves a secret or directory (and all its children) from src to dst.
 // Preserves version history. Returns the number of secrets moved.
 func (c *Client) MoveRecursive(src, dst string) (int, error) {
-	n, err := c.CopyRecursiveWithHistory(src, dst)
+	return c.MoveRecursiveCtx(context.Background(), src, dst, nil)
+}
+
+// CountRecursive counts the total number of secrets under a path (including the path itself if it's a secret).
+func (c *Client) CountRecursive(path string) (int, error) {
+	entries, err := c.List(path)
+	if entries == nil || err != nil {
+		// Not a directory or List failed — treat as a single secret.
+		return 1, nil //nolint:nilerr // List error means it's a single secret, not a real error
+	}
+
+	dirPath := path
+	if !strings.HasSuffix(dirPath, "/") {
+		dirPath += "/"
+	}
+
+	count := 0
+	for _, e := range entries {
+		childPath := dirPath + e.Name
+		if e.IsDir {
+			n, err := c.CountRecursive(strings.TrimSuffix(childPath, "/"))
+			if err != nil {
+				return count, err
+			}
+			count += n
+		} else {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// DeleteRecursiveCtx is like DeleteRecursive but supports context cancellation and progress reporting.
+func (c *Client) DeleteRecursiveCtx(ctx context.Context, path string, cb ProgressCallback, counter *int) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	entries, err := c.List(path)
+	if err != nil || entries == nil {
+		if err := c.Delete(path); err != nil {
+			return 0, err
+		}
+		if counter != nil {
+			*counter++
+		}
+		if cb != nil {
+			cb(*counter, 0)
+		}
+		return 1, nil
+	}
+
+	dirPath := path
+	if !strings.HasSuffix(dirPath, "/") {
+		dirPath += "/"
+	}
+
+	count := 0
+	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return count, err
+		}
+		childPath := dirPath + e.Name
+		if e.IsDir {
+			n, err := c.DeleteRecursiveCtx(ctx, strings.TrimSuffix(childPath, "/"), cb, counter)
+			if err != nil {
+				return count + n, err
+			}
+			count += n
+		} else {
+			if err := c.Delete(childPath); err != nil {
+				return count, fmt.Errorf("deleting %s: %w", childPath, err)
+			}
+			count++
+			if counter != nil {
+				*counter++
+			}
+			if cb != nil {
+				cb(*counter, 0)
+			}
+		}
+	}
+	return count, nil
+}
+
+// CopyRecursiveWithHistoryCtx is like CopyRecursiveWithHistory but supports context cancellation and progress.
+func (c *Client) CopyRecursiveWithHistoryCtx(ctx context.Context, src, dst string, cb ProgressCallback, counter *int) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	entries, err := c.List(src)
+	if err != nil || entries == nil {
+		if err := c.CopyWithHistory(src, dst); err != nil {
+			return 0, err
+		}
+		if counter != nil {
+			*counter++
+		}
+		if cb != nil {
+			cb(*counter, 0)
+		}
+		return 1, nil
+	}
+
+	srcDir := src
+	if !strings.HasSuffix(srcDir, "/") {
+		srcDir += "/"
+	}
+	dstDir := dst
+	if !strings.HasSuffix(dstDir, "/") {
+		dstDir += "/"
+	}
+
+	count := 0
+	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return count, err
+		}
+		childSrc := srcDir + e.Name
+		childDst := dstDir + e.Name
+		if e.IsDir {
+			n, err := c.CopyRecursiveWithHistoryCtx(
+				ctx,
+				strings.TrimSuffix(childSrc, "/"),
+				strings.TrimSuffix(childDst, "/"),
+				cb, counter,
+			)
+			if err != nil {
+				return count + n, err
+			}
+			count += n
+		} else {
+			if err := c.CopyWithHistory(childSrc, childDst); err != nil {
+				return count, fmt.Errorf("copying %s: %w", childSrc, err)
+			}
+			count++
+			if counter != nil {
+				*counter++
+			}
+			if cb != nil {
+				cb(*counter, 0)
+			}
+		}
+	}
+	return count, nil
+}
+
+// MoveRecursiveCtx is like MoveRecursive but supports context cancellation and progress.
+func (c *Client) MoveRecursiveCtx(ctx context.Context, src, dst string, cb ProgressCallback) (int, error) {
+	counter := 0
+	n, err := c.CopyRecursiveWithHistoryCtx(ctx, src, dst, cb, &counter)
 	if err != nil {
 		return n, err
 	}
-	if _, err := c.DeleteRecursive(src); err != nil {
+	if err := ctx.Err(); err != nil {
+		return n, err
+	}
+	if _, err := c.DeleteRecursiveCtx(ctx, src, cb, &counter); err != nil {
 		return n, fmt.Errorf("deleting source %s after copy: %w", src, err)
 	}
 	return n, nil

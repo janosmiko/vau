@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -207,6 +208,10 @@ type Model struct {
 	themeEntries      []ui.ThemeEntry // grouped theme list with headers
 	themeCursor       int
 	activeColorscheme string // currently applied colorscheme name
+
+	// Progress tracking for long-running operations
+	program  *tea.Program  // reference to the tea.Program for sending progress updates
+	progress progressState // tracks active operation progress
 }
 
 // NewModel creates a new application model.
@@ -324,6 +329,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	case progressTickMsg:
+		m.progress.current = msg.current
+		if msg.total > 0 {
+			m.progress.total = msg.total
+		}
+		return m, nil
+
+	case progressDoneMsg:
+		m.progress.active = false
+		m.progress.cancel = nil
+		if msg.err != nil {
+			if msg.err == context.Canceled {
+				m.status = fmt.Sprintf("Cancelled %s: %d items processed", msg.operation, msg.count)
+			} else {
+				m.errMsg = fmt.Sprintf("%s failed after %d items: %v", msg.operation, msg.count, msg.err)
+			}
+		} else {
+			m.status = msg.status
+			m.errMsg = ""
+		}
+		return m, m.refresh()
 
 	case listResultMsg:
 		return m.handleListResult(msg)
@@ -605,7 +632,17 @@ func (m *Model) View() string {
 
 	// Status/error bar
 	var statusBar string
-	if m.errMsg != "" {
+	if m.progress.active {
+		var progressText string
+		if m.progress.total > 0 {
+			progressText = fmt.Sprintf("%s %d/%d secrets... [Ctrl+C to cancel]",
+				m.progress.operation, m.progress.current, m.progress.total)
+		} else {
+			progressText = fmt.Sprintf("%s... (%d done) [Ctrl+C to cancel]",
+				m.progress.operation, m.progress.current)
+		}
+		statusBar = ui.StatusStyle.Render(progressText)
+	} else if m.errMsg != "" {
 		statusBar = ui.ErrorStyle.Render("Error: " + m.errMsg)
 	} else if m.status != "" {
 		statusBar = ui.StatusStyle.Render(m.status)
@@ -780,6 +817,20 @@ func (m *Model) mountEntries() []model.Entry {
 // --- Key handling ---
 
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// During active progress, only allow cancellation
+	if m.progress.active {
+		key := msg.String()
+		if key == "ctrl+c" || key == "esc" {
+			if m.progress.cancel != nil {
+				m.progress.cancel()
+			}
+			m.status = fmt.Sprintf("Cancelling %s...", m.progress.operation)
+			return m, nil
+		}
+		// Swallow all other keys during progress
+		return m, nil
+	}
+
 	// Input mode: delegate to textinput
 	if m.mode == model.ModeInput {
 		return m.handleInputKey(msg)
@@ -844,6 +895,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleMouse processes mouse events for all view modes.
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Swallow mouse events during progress
+	if m.progress.active {
+		return m, nil
+	}
 	// Ignore motion-only events (no button pressed).
 	if msg.Button == tea.MouseButtonNone {
 		return m, nil
@@ -3238,16 +3293,48 @@ func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
 }
 
 func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
-	return func() tea.Msg {
-		path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
-		if entry.IsDir {
-			count, err := m.client.DeleteRecursive(path)
-			if err != nil {
-				return errorMsg(err.Error())
-			}
-			// Directory deletes cannot be undone (no stored data for all children).
-			return statusMsg(fmt.Sprintf("Deleted %d secrets in %s (cannot undo)", count, entry.Name))
+	path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
+	client := m.client
+
+	if entry.IsDir {
+		operation := "Deleting"
+		total, _ := client.CountRecursive(path)
+
+		ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
+		m.progress = progressState{
+			active:    true,
+			cancel:    cancel,
+			operation: operation,
+			current:   0,
+			total:     total,
 		}
+
+		var reporter *progressReporter
+		if m.program != nil {
+			reporter = newProgressReporter(m.program)
+		}
+
+		return func() tea.Msg {
+			counter := 0
+			var cb vault.ProgressCallback
+			if reporter != nil {
+				cb = func(current, _ int) {
+					reporter.report(current, total)
+				}
+			}
+			count, err := client.DeleteRecursiveCtx(ctx, path, cb, &counter)
+			if err != nil {
+				return progressDoneMsg{operation: operation, count: count, err: err}
+			}
+			return progressDoneMsg{
+				operation: operation,
+				count:     count,
+				status:    fmt.Sprintf("Deleted %d secrets in %s (cannot undo)", count, entry.Name),
+			}
+		}
+	}
+
+	return func() tea.Msg {
 		// Read secret data before deleting (for undo)
 		secret, _ := m.client.Read(path)
 		if err := m.client.Delete(path); err != nil {
@@ -3359,46 +3446,89 @@ func (m *Model) pasteSecrets() tea.Cmd {
 	yankedSecrets := make([]*model.Secret, len(m.yankedSecrets))
 	copy(yankedSecrets, m.yankedSecrets)
 	basePath := m.currentPath()
+	client := m.client
 
-	return func() tea.Msg {
-		// Directory operations (both cut and copy).
-		if isDir && len(yankPaths) > 0 {
+	// Directory operations use progress tracking.
+	if isDir && len(yankPaths) > 0 {
+		operation := "Copying"
+		if isCut {
+			operation = "Moving"
+		}
+
+		// Count total items for progress display (best-effort).
+		total := 0
+		for _, yp := range yankPaths {
+			n, err := client.CountRecursive(yp)
+			if err == nil {
+				total += n
+			}
+		}
+		if isCut {
+			total *= 2 // copy + delete phases
+		}
+
+		ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
+		m.progress = progressState{
+			active:    true,
+			cancel:    cancel,
+			operation: operation,
+			current:   0,
+			total:     total,
+		}
+
+		var reporter *progressReporter
+		if m.program != nil {
+			reporter = newProgressReporter(m.program)
+		}
+
+		return func() tea.Msg {
 			totalCount := 0
+			counter := 0
 			for _, yp := range yankPaths {
 				parts := strings.Split(strings.TrimSuffix(yp, "/"), "/")
 				name := parts[len(parts)-1]
 				dst := basePath + name
 
 				// If destination directory already exists, append _1, _2, etc.
-				if entries, err := m.client.List(dst); err == nil && entries != nil {
+				if entries, err := client.List(dst); err == nil && entries != nil {
 					for i := 1; ; i++ {
 						candidate := basePath + fmt.Sprintf("%s_%d", name, i)
-						if entries, err := m.client.List(candidate); err != nil || entries == nil {
+						if entries, err := client.List(candidate); err != nil || entries == nil {
 							dst = candidate
 							break
 						}
 					}
 				}
 
+				var cb vault.ProgressCallback
+				if reporter != nil {
+					cb = func(current, _ int) {
+						reporter.report(current, total)
+					}
+				}
+
 				if isCut {
-					count, err := m.client.MoveRecursive(yp, dst)
+					count, err := client.MoveRecursiveCtx(ctx, yp, dst, cb)
 					if err != nil {
-						return errorMsg(fmt.Sprintf("moved %d items, then error: %v", totalCount, err))
+						return progressDoneMsg{operation: operation, count: totalCount + count, err: err}
 					}
 					totalCount += count
 				} else {
-					count, err := m.client.CopyRecursiveWithHistory(yp, dst)
+					count, err := client.CopyRecursiveWithHistoryCtx(ctx, yp, dst, cb, &counter)
 					if err != nil {
-						return errorMsg(fmt.Sprintf("copied %d items, then error: %v", totalCount, err))
+						return progressDoneMsg{operation: operation, count: totalCount + count, err: err}
 					}
 					totalCount += count
 				}
 			}
 			if isCut {
-				return statusMsg(fmt.Sprintf("Moved %d items", totalCount))
+				return progressDoneMsg{operation: operation, count: totalCount, status: fmt.Sprintf("Moved %d items", totalCount)}
 			}
-			return statusMsg(fmt.Sprintf("Copied %d items (with history)", totalCount))
+			return progressDoneMsg{operation: operation, count: totalCount, status: fmt.Sprintf("Copied %d items (with history)", totalCount)}
 		}
+	}
+
+	return func() tea.Msg {
 
 		if len(yankedSecrets) == 0 {
 			return errorMsg("nothing yanked")
@@ -3735,25 +3865,69 @@ func (m *Model) selectedVisible() map[int]bool {
 }
 
 func (m *Model) bulkDelete(entries []model.Entry) tea.Cmd {
+	operation := "Deleting"
+	basePath := m.currentPath()
+	client := m.client
+
+	// Count total items for progress.
+	total := 0
+	for _, entry := range entries {
+		if entry.IsDir {
+			path := basePath + strings.TrimSuffix(entry.Name, "/")
+			n, _ := client.CountRecursive(path)
+			total += n
+		} else {
+			total++
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
+	m.progress = progressState{
+		active:    true,
+		cancel:    cancel,
+		operation: operation,
+		current:   0,
+		total:     total,
+	}
+	m.selected = make(map[int]bool)
+
+	var reporter *progressReporter
+	if m.program != nil {
+		reporter = newProgressReporter(m.program)
+	}
+
 	return func() tea.Msg {
 		deleted := 0
+		counter := 0
 		for _, entry := range entries {
-			path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
+			if err := ctx.Err(); err != nil {
+				return progressDoneMsg{operation: operation, count: deleted, err: err}
+			}
+			path := basePath + strings.TrimSuffix(entry.Name, "/")
 			if entry.IsDir {
-				n, err := m.client.DeleteRecursive(path)
+				var cb vault.ProgressCallback
+				if reporter != nil {
+					cb = func(current, _ int) {
+						reporter.report(current, total)
+					}
+				}
+				n, err := client.DeleteRecursiveCtx(ctx, path, cb, &counter)
 				if err != nil {
-					return errorMsg(fmt.Sprintf("deleted %d, then error: %v", deleted, err))
+					return progressDoneMsg{operation: operation, count: deleted + n, err: err}
 				}
 				deleted += n
 			} else {
-				if err := m.client.Delete(path); err != nil {
-					return errorMsg(fmt.Sprintf("deleted %d, then error: %v", deleted, err))
+				if err := client.Delete(path); err != nil {
+					return progressDoneMsg{operation: operation, count: deleted, err: fmt.Errorf("deleting %s: %w", path, err)}
 				}
 				deleted++
+				counter++
+				if reporter != nil {
+					reporter.report(counter, total)
+				}
 			}
 		}
-		m.selected = make(map[int]bool)
-		return statusMsg(fmt.Sprintf("Deleted %d items", deleted))
+		return progressDoneMsg{operation: operation, count: deleted, status: fmt.Sprintf("Deleted %d items", deleted)}
 	}
 }
 
