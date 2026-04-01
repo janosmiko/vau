@@ -92,7 +92,29 @@ type TabState struct {
 	filteredIdx    []int
 	atMountLevel   bool
 	mountCursor    int
-	mount          string // which mount this tab is using
+	mount          string         // which mount this tab is using
+	viewMode       model.ViewMode // preserved for workspace views
+
+	// Workspace state (per-tab)
+	policies          []string
+	policyCursor      int
+	policyPreview     string
+	authMethods       []model.Entry
+	authCursor        int
+	rolePreview       []model.Entry
+	roles             []model.Entry
+	roleCursor        int
+	roleAuthPath      string
+	roleDataPreview   map[string]any
+	entities          []model.Entry
+	entityCursor      int
+	entityDataPreview map[string]any
+	groups            []model.Entry
+	groupCursor       int
+	groupDataPreview  map[string]any
+	tokenAccessors    []model.Entry
+	tokenCursor       int
+	tokenDataPreview  map[string]any
 }
 
 // Model is the main application model.
@@ -151,6 +173,7 @@ type Model struct {
 	confirmMsg      string
 	confirmAction   func() tea.Cmd
 	prevConfirmMode model.ViewMode // mode to return to after confirm
+	prevInputMode   model.ViewMode // mode to return to after input
 	confirmInput    textinput.Model
 
 	// Input prompt
@@ -212,6 +235,46 @@ type Model struct {
 	// Progress tracking for long-running operations
 	program  *tea.Program  // reference to the tea.Program for sending progress updates
 	progress progressState // tracks active operation progress
+
+	// Policy and access category state
+	policies      []string // cached policy names
+	policyCursor  int
+	policyName    string // name of the policy being viewed
+	policyContent string // HCL content of the viewed policy
+	policyScroll  int
+	policyPreview string // HCL preview for selected policy in list
+
+	authMethods     []model.Entry // cached auth method list
+	authCursor      int
+	roles           []model.Entry // cached role list for selected auth method
+	roleCursor      int
+	roleName        string
+	roleAuthPath    string         // which auth method's roles we're viewing
+	roleData        map[string]any // role config data for viewed role
+	roleScroll      int
+	rolePreview     []model.Entry  // role names preview for selected auth method
+	roleDataPreview map[string]any // role data preview for selected role
+
+	entities          []model.Entry // cached entity list
+	entityCursor      int
+	entityName        string
+	entityData        map[string]any // entity data for viewed entity
+	entityScroll      int
+	entityDataPreview map[string]any // entity data preview for selected entity
+
+	groups           []model.Entry // cached group list
+	groupCursor      int
+	groupName        string
+	groupData        map[string]any // group data for viewed group
+	groupScroll      int
+	groupDataPreview map[string]any // group data preview for selected group
+
+	tokenAccessors   []model.Entry // cached token accessor list
+	tokenCursor      int
+	tokenData        map[string]any // metadata for viewed token
+	tokenScroll      int
+	tokenDataPreview map[string]any // preview for selected accessor
+	tokenCreatedData map[string]any // newly created token data (one-time view)
 }
 
 // NewModel creates a new application model.
@@ -289,6 +352,28 @@ func (m *Model) saveCurrentTab() {
 	t.atMountLevel = m.atMountLevel
 	t.mountCursor = m.mountCursor
 	t.mount = m.client.Mount()
+	t.viewMode = m.mode
+
+	// Workspace state
+	t.policies = append([]string(nil), m.policies...)
+	t.policyCursor = m.policyCursor
+	t.policyPreview = m.policyPreview
+	t.authMethods = append([]model.Entry(nil), m.authMethods...)
+	t.authCursor = m.authCursor
+	t.rolePreview = append([]model.Entry(nil), m.rolePreview...)
+	t.roles = append([]model.Entry(nil), m.roles...)
+	t.roleCursor = m.roleCursor
+	t.roleAuthPath = m.roleAuthPath
+	t.roleDataPreview = m.roleDataPreview
+	t.entities = append([]model.Entry(nil), m.entities...)
+	t.entityCursor = m.entityCursor
+	t.entityDataPreview = m.entityDataPreview
+	t.groups = append([]model.Entry(nil), m.groups...)
+	t.groupCursor = m.groupCursor
+	t.groupDataPreview = m.groupDataPreview
+	t.tokenAccessors = append([]model.Entry(nil), m.tokenAccessors...)
+	t.tokenCursor = m.tokenCursor
+	t.tokenDataPreview = m.tokenDataPreview
 }
 
 // loadTab restores Model fields from the given tab index.
@@ -296,8 +381,16 @@ func (m *Model) loadTab(idx int) {
 	t := m.tabs[idx]
 	m.activeTab = idx
 
-	// Close any open popup/overlay
-	m.mode = model.ModeExplorer
+	// Restore mode — for overlay modes (secret popup, confirm, etc.) fall back to explorer;
+	// for workspace list modes (policies, auth methods, etc.) preserve them.
+	switch t.viewMode {
+	case model.ModeExplorer, model.ModePolicyList, model.ModeAuthMethods,
+		model.ModeRoleList, model.ModeEntityList, model.ModeGroupList,
+		model.ModeTokenList:
+		m.mode = t.viewMode
+	default:
+		m.mode = model.ModeExplorer
+	}
 	m.secret = nil
 	m.textInput.Blur()
 	m.searchInput.Blur()
@@ -317,6 +410,27 @@ func (m *Model) loadTab(idx int) {
 	m.atMountLevel = t.atMountLevel
 	m.mountCursor = t.mountCursor
 	m.client.SetMount(t.mount)
+
+	// Workspace state
+	m.policies = append([]string(nil), t.policies...)
+	m.policyCursor = t.policyCursor
+	m.policyPreview = t.policyPreview
+	m.authMethods = append([]model.Entry(nil), t.authMethods...)
+	m.authCursor = t.authCursor
+	m.rolePreview = append([]model.Entry(nil), t.rolePreview...)
+	m.roles = append([]model.Entry(nil), t.roles...)
+	m.roleCursor = t.roleCursor
+	m.roleAuthPath = t.roleAuthPath
+	m.roleDataPreview = t.roleDataPreview
+	m.entities = append([]model.Entry(nil), t.entities...)
+	m.entityCursor = t.entityCursor
+	m.entityDataPreview = t.entityDataPreview
+	m.groups = append([]model.Entry(nil), t.groups...)
+	m.groupCursor = t.groupCursor
+	m.groupDataPreview = t.groupDataPreview
+	m.tokenAccessors = append([]model.Entry(nil), t.tokenAccessors...)
+	m.tokenCursor = t.tokenCursor
+	m.tokenDataPreview = t.tokenDataPreview
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -372,6 +486,69 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+
+	// Workspace messages (policies, auth methods, roles)
+	case policyListMsg:
+		return m.handlePolicyListResult(msg)
+	case policyContentMsg:
+		return m.handlePolicyContentResult(msg)
+	case policyPreviewMsg:
+		m.policyPreview = msg.content
+		return m, nil
+	case authMethodsMsg:
+		return m.handleAuthMethodsResult(msg)
+	case roleListMsg:
+		return m.handleRoleListResult(msg)
+	case roleDataMsg:
+		return m.handleRoleDataResult(msg)
+	case rolePreviewMsg:
+		m.rolePreview = msg.roles
+		return m, nil
+	case roleDataPreviewMsg:
+		m.roleDataPreview = msg.data
+		return m, nil
+
+	case entityListMsg:
+		return m.handleEntityListResult(msg)
+	case entityDataMsg:
+		return m.handleEntityDataResult(msg)
+	case entityDataPreviewMsg:
+		m.entityDataPreview = msg.data
+		return m, nil
+
+	case groupListMsg:
+		return m.handleGroupListResult(msg)
+	case groupDataMsg:
+		return m.handleGroupDataResult(msg)
+	case groupDataPreviewMsg:
+		m.groupDataPreview = msg.data
+		return m, nil
+
+	case policyContentForEditMsg:
+		return m, m.editPolicyInEditor(msg.name, msg.content)
+	case roleDataForEditMsg:
+		return m, m.editRoleInEditor(msg.authPath, msg.name, msg.data)
+
+	case policyEditorResultMsg:
+		return m.handlePolicyEditorResult(msg)
+	case policyDeletedMsg:
+		return m.handlePolicyDeletedResult(msg)
+	case roleEditorResultMsg:
+		return m.handleRoleEditorResult(msg)
+	case roleDeletedMsg:
+		return m.handleRoleDeletedResult(msg)
+
+	case tokenListMsg:
+		return m.handleTokenListResult(msg)
+	case tokenDataMsg:
+		return m.handleTokenDataResult(msg)
+	case tokenDataPreviewMsg:
+		m.tokenDataPreview = msg.data
+		return m, nil
+	case tokenCreatedMsg:
+		return m.handleTokenCreatedResult(msg)
+	case tokenRevokedMsg:
+		return m.handleTokenRevokedResult(msg)
 
 	case statusMsg:
 		m.status = string(msg)
@@ -588,18 +765,24 @@ func (m *Model) View() string {
 	if len(m.tabs) > 1 {
 		m.saveCurrentTab()
 		for _, t := range m.tabs {
-			var label string
-			if len(t.path) > 0 {
-				label = t.path[len(t.path)-1]
-			} else {
-				label = t.mount + "/"
-			}
-			tabLabels = append(tabLabels, label)
+			tabLabels = append(tabLabels, tabLabel(t))
 		}
 	}
 
 	bgMode := m.backgroundMode()
 	switch bgMode {
+	case model.ModePolicyList:
+		content = m.renderPolicyListView()
+	case model.ModeAuthMethods:
+		content = m.renderAuthMethodListView()
+	case model.ModeRoleList:
+		content = m.renderRoleListView()
+	case model.ModeEntityList:
+		content = m.renderEntityListView()
+	case model.ModeGroupList:
+		content = m.renderGroupListView()
+	case model.ModeTokenList:
+		content = m.renderTokenListView()
 	case model.ModeExplorer:
 		explorerHeight := m.height - 2
 		if m.atMountLevel {
@@ -697,6 +880,24 @@ func (m *Model) View() string {
 	case model.ModeThemePicker:
 		overlay := ui.RenderThemePickerOverlay(m.themeEntries, m.themeCursor, m.activeColorscheme, m.width, m.height)
 		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModePolicyView:
+		overlay := ui.RenderPolicyViewOverlay(m.policyName, m.policyContent, m.policyScroll, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeRoleView:
+		overlay := ui.RenderRoleViewOverlay(m.roleName, m.roleData, m.roleScroll, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeEntityView:
+		overlay := ui.RenderEntityViewOverlay(m.entityName, m.entityData, m.entityScroll, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeGroupView:
+		overlay := ui.RenderGroupViewOverlay(m.groupName, m.groupData, m.groupScroll, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeTokenView:
+		overlay := ui.RenderRoleViewOverlay(m.tokenAccessors[m.tokenCursor].Name, m.tokenData, m.tokenScroll, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeTokenCreated:
+		overlay := ui.RenderTokenCreatedOverlay(m.tokenCreatedData, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
 	}
 
 	return base
@@ -767,33 +968,38 @@ func (m *Model) backgroundMode() model.ViewMode {
 	case model.ModeConfirm:
 		return m.prevConfirmMode
 	case model.ModeInput:
-		// Input overlays always sit on top of explorer
-		return model.ModeExplorer
+		return m.prevInputMode
 	case model.ModeSecret, model.ModeSecretEdit, model.ModeVersionHistory, model.ModeSearch, model.ModeFilter, model.ModeHelp, model.ModeJumpPath, model.ModeBookmark, model.ModeThemePicker:
 		return model.ModeExplorer
+	case model.ModePolicyView:
+		return model.ModePolicyList
+	case model.ModeRoleView:
+		return model.ModeRoleList
+	case model.ModeEntityView:
+		return model.ModeEntityList
+	case model.ModeGroupView:
+		return model.ModeGroupList
+	case model.ModeTokenView, model.ModeTokenCreated:
+		return model.ModeTokenList
 	default:
 		return m.mode
 	}
 }
 
-// Left pane: at root level show mounts, otherwise show parent entries
+// Left pane: at root level show mounts + access categories, otherwise show parent entries
 func (m *Model) leftPaneEntries() []model.Entry {
 	if len(m.path) == 0 {
-		// At mount root: show mounts in left pane
-		entries := make([]model.Entry, 0, len(m.mounts))
-		for _, mt := range m.mounts {
-			entries = append(entries, model.Entry{Name: mt + "/", IsDir: true})
-		}
-		return entries
+		return m.mountEntries()
 	}
 	return m.parentList
 }
 
 func (m *Model) leftPaneSelectedIdx() int {
 	if len(m.path) == 0 {
-		// Highlight current mount
-		for i, mt := range m.mounts {
-			if mt == m.client.Mount() {
+		// Highlight current mount in the combined root list
+		mountName := m.client.Mount() + "/"
+		for i, e := range m.mountEntries() {
+			if e.Name == mountName {
 				return i
 			}
 		}
@@ -806,12 +1012,40 @@ func (m *Model) leftPaneSelectedIdx() int {
 	return 0
 }
 
+// Access category names shown at root level alongside KV mounts.
+const (
+	accessPolicies    = "[Policies]"
+	accessAuthMethods = "[Auth Methods]"
+	accessEntities    = "[Entities]"
+	accessGroups      = "[Groups]"
+	accessLeases      = "[Leases]"
+	accessTokens      = "[Tokens]"
+)
+
 func (m *Model) mountEntries() []model.Entry {
-	entries := make([]model.Entry, 0, len(m.mounts))
+	entries := make([]model.Entry, 0, len(m.mounts)+5)
 	for _, mt := range m.mounts {
 		entries = append(entries, model.Entry{Name: mt + "/", IsDir: true})
 	}
+	// Access categories
+	entries = append(entries,
+		model.Entry{Name: accessPolicies, IsDir: true},
+		model.Entry{Name: accessAuthMethods, IsDir: true},
+		model.Entry{Name: accessEntities, IsDir: true},
+		model.Entry{Name: accessGroups, IsDir: true},
+		model.Entry{Name: accessLeases, IsDir: true},
+		model.Entry{Name: accessTokens, IsDir: true},
+	)
 	return entries
+}
+
+// isAccessCategory returns true if the entry name is a virtual access category.
+func isAccessCategory(name string) bool {
+	switch name {
+	case accessPolicies, accessAuthMethods, accessEntities, accessGroups, accessLeases, accessTokens:
+		return true
+	}
+	return false
 }
 
 // --- Key handling ---
@@ -828,6 +1062,47 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Swallow all other keys during progress
+		return m, nil
+	}
+
+	// Policy and role mode routing
+	if m.mode == model.ModePolicyList {
+		return m.handlePolicyListKey(msg)
+	}
+	if m.mode == model.ModePolicyView {
+		return m.handlePolicyViewKey(msg)
+	}
+	if m.mode == model.ModeAuthMethods {
+		return m.handleAuthMethodsKey(msg)
+	}
+	if m.mode == model.ModeRoleList {
+		return m.handleRoleListKey(msg)
+	}
+	if m.mode == model.ModeRoleView {
+		return m.handleRoleViewKey(msg)
+	}
+	if m.mode == model.ModeEntityList {
+		return m.handleEntityListKey(msg)
+	}
+	if m.mode == model.ModeEntityView {
+		return m.handleEntityViewKey(msg)
+	}
+	if m.mode == model.ModeGroupList {
+		return m.handleGroupListKey(msg)
+	}
+	if m.mode == model.ModeGroupView {
+		return m.handleGroupViewKey(msg)
+	}
+	if m.mode == model.ModeTokenList {
+		return m.handleTokenListKey(msg)
+	}
+	if m.mode == model.ModeTokenView {
+		return m.handleTokenViewKey(msg)
+	}
+	if m.mode == model.ModeTokenCreated {
+		// Any key dismisses the token created overlay
+		m.mode = model.ModeTokenList
+		m.tokenCreatedData = nil
 		return m, nil
 	}
 
@@ -1313,7 +1588,8 @@ func (m *Model) handleMountKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case matchKey(key, m.keys.Up):
-		if m.mountCursor < len(m.mounts)-1 {
+		allEntries := m.mountEntries()
+		if m.mountCursor < len(allEntries)-1 {
 			m.mountCursor++
 			return m, m.loadMountPreview()
 		}
@@ -1325,8 +1601,15 @@ func (m *Model) handleMountKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case matchKey(key, m.keys.Right) || matchKey(key, m.keys.Open):
-		if len(m.mounts) > 0 && m.mountCursor < len(m.mounts) {
-			m.client.SetMount(m.mounts[m.mountCursor])
+		allEntries := m.mountEntries()
+		if m.mountCursor < len(allEntries) {
+			selected := allEntries[m.mountCursor]
+			if isAccessCategory(selected.Name) {
+				return m.enterAccessCategory(selected.Name)
+			}
+			// KV mount
+			mountName := strings.TrimSuffix(selected.Name, "/")
+			m.client.SetMount(mountName)
 			m.atMountLevel = false
 			m.path = nil
 			m.cursor = 0
@@ -2766,6 +3049,7 @@ func copyMapIntBool(src map[int]bool) map[int]bool {
 // --- Input handling (using textinput) ---
 
 func (m *Model) startInput(action model.InputAction, label, value string) tea.Cmd {
+	m.prevInputMode = m.mode
 	m.mode = model.ModeInput
 	m.inputAction = action
 	m.inputLabel = label
@@ -2779,11 +3063,7 @@ func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.textInput.Blur()
-		if m.secret != nil {
-			m.mode = model.ModeSecret
-		} else {
-			m.mode = model.ModeExplorer
-		}
+		m.mode = m.prevInputMode
 		m.inputAction = model.InputNone
 		m.inputBuffer = ""
 		return m, nil
@@ -2854,6 +3134,22 @@ func (m *Model) handleInputSubmit() (tea.Model, tea.Cmd) {
 		m.inputAction = model.InputNone
 		key := m.secret.Keys[m.secretCursor]
 		return m, m.editValue(key, value)
+
+	case model.InputNewPolicy:
+		m.mode = model.ModePolicyList
+		m.inputAction = model.InputNone
+		if value == "" {
+			return m, nil
+		}
+		return m, m.createPolicyWithEditor(value)
+
+	case model.InputNewRole:
+		m.mode = model.ModeRoleList
+		m.inputAction = model.InputNone
+		if value == "" {
+			return m, nil
+		}
+		return m, m.createRoleWithEditor(m.roleAuthPath, value)
 	}
 
 	m.mode = model.ModeExplorer
@@ -3182,10 +3478,20 @@ func (m *Model) loadMounts() tea.Cmd {
 }
 
 func (m *Model) loadMountPreview() tea.Cmd {
-	if len(m.mounts) == 0 || m.mountCursor >= len(m.mounts) {
+	allEntries := m.mountEntries()
+	if m.mountCursor >= len(allEntries) {
 		return nil
 	}
-	mount := m.mounts[m.mountCursor]
+
+	selected := allEntries[m.mountCursor]
+
+	// Access category previews
+	if isAccessCategory(selected.Name) {
+		return m.loadAccessCategoryPreview(selected.Name)
+	}
+
+	// KV mount preview
+	mount := strings.TrimSuffix(selected.Name, "/")
 	return func() tea.Msg {
 		entries, err := m.client.ListWithMount(mount, "")
 		if err != nil {
@@ -3193,6 +3499,47 @@ func (m *Model) loadMountPreview() tea.Cmd {
 		}
 		return listResultMsg{path: "@@mount_preview@@", entries: entries}
 	}
+}
+
+// loadAccessCategoryPreview loads a preview for access categories at root level.
+func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
+	switch name {
+	case accessPolicies:
+		return func() tea.Msg {
+			policies, _ := m.client.ListPolicies()
+			entries := make([]model.Entry, len(policies))
+			for i, p := range policies {
+				entries[i] = model.Entry{Name: p}
+			}
+			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+		}
+	case accessAuthMethods:
+		return func() tea.Msg {
+			methods, _ := m.client.ListAuthMethods()
+			return listResultMsg{path: "@@mount_preview@@", entries: methods}
+		}
+	case accessEntities:
+		return func() tea.Msg {
+			entries, _ := m.client.ListEntities()
+			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+		}
+	case accessGroups:
+		return func() tea.Msg {
+			entries, _ := m.client.ListGroups()
+			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+		}
+	case accessLeases:
+		return func() tea.Msg {
+			// Leases require prefix — show empty for now
+			return listResultMsg{path: "@@mount_preview@@", entries: nil}
+		}
+	case accessTokens:
+		return func() tea.Msg {
+			entries, _ := m.client.ListTokenAccessors()
+			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+		}
+	}
+	return nil
 }
 
 func (m *Model) listDir(path string) tea.Cmd {

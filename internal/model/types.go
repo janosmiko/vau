@@ -38,6 +38,18 @@ const (
 	ModeJumpPath       // jump-to-path prompt (S)
 	ModeBookmark       // bookmark overlay
 	ModeThemePicker    // colorscheme picker overlay
+	ModePolicyList     // policy list view
+	ModePolicyView     // viewing a single policy's HCL
+	ModeAuthMethods    // auth method list
+	ModeRoleList       // role list within an auth method
+	ModeRoleView       // viewing a single role's data
+	ModeEntityList     // identity entity list
+	ModeEntityView     // viewing a single entity's data
+	ModeGroupList      // identity group list
+	ModeGroupView      // viewing a single group's data
+	ModeTokenList      // token accessor list
+	ModeTokenView      // viewing a single token's accessor metadata
+	ModeTokenCreated   // showing newly created token (one-time view)
 )
 
 // UndoType represents the kind of action that can be undone.
@@ -81,4 +93,6 @@ const (
 	InputNewKey
 	InputNewValue
 	InputEditValue
+	InputNewPolicy // name prompt for new policy
+	InputNewRole   // name prompt for new role
 )

@@ -72,6 +72,80 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"Enter", "select"},
 			{"esc", "cancel"},
 		}
+	case model.ModePolicyList:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view"},
+			{"a", "create"},
+			{"D", "delete"},
+			{"esc", "back"},
+		}
+	case model.ModePolicyView:
+		bindings = []helpBinding{
+			{"jk", "scroll"},
+			{"e", "edit"},
+			{"Ctrl+D/U", "page"},
+			{"esc", "back"},
+		}
+	case model.ModeAuthMethods:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view roles"},
+			{"esc", "back"},
+		}
+	case model.ModeRoleList:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view"},
+			{"a", "create"},
+			{"D", "delete"},
+			{"esc", "back"},
+		}
+	case model.ModeRoleView:
+		bindings = []helpBinding{
+			{"jk", "scroll"},
+			{"e", "edit"},
+			{"esc", "back"},
+		}
+	case model.ModeEntityList:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view entity"},
+			{"esc", "back"},
+		}
+	case model.ModeEntityView:
+		bindings = []helpBinding{
+			{"jk", "scroll"},
+			{"esc", "back"},
+		}
+	case model.ModeGroupList:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view group"},
+			{"esc", "back"},
+		}
+	case model.ModeGroupView:
+		bindings = []helpBinding{
+			{"jk", "scroll"},
+			{"esc", "back"},
+		}
+	case model.ModeTokenList:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"Enter", "view"},
+			{"a", "create"},
+			{"D", "revoke"},
+			{"esc", "back"},
+		}
+	case model.ModeTokenView:
+		bindings = []helpBinding{
+			{"jk", "scroll"},
+			{"esc", "back"},
+		}
+	case model.ModeTokenCreated:
+		bindings = []helpBinding{
+			{"any key", "dismiss"},
+		}
 	case model.ModeHelp:
 		bindings = []helpBinding{}
 	case model.ModeConfirm:
@@ -268,6 +342,42 @@ func helpSections() []helpSection {
 				{"D", "Delete selected (in overlay)"},
 				{"Ctrl+X", "Delete all (in overlay)"},
 				{"Esc", "Close overlay"},
+			},
+		},
+		{
+			title: "Policies (from root level)",
+			bindings: []helpBinding{
+				{"j / k", "Navigate policies"},
+				{"Enter / l", "View policy HCL"},
+				{"a", "Create new policy (opens editor)"},
+				{"e (in view)", "Edit policy (opens editor)"},
+				{"D", "Delete policy (with confirmation)"},
+				{"j / k (in view)", "Scroll HCL content"},
+				{"Ctrl+D / Ctrl+U", "Half-page scroll (in view)"},
+				{"Esc / h", "Back to root level"},
+			},
+		},
+		{
+			title: "Auth Methods / Roles (from root level)",
+			bindings: []helpBinding{
+				{"j / k", "Navigate auth methods or roles"},
+				{"Enter / l", "Enter auth method or view role"},
+				{"a", "Create new role (opens JSON editor)"},
+				{"e (in view)", "Edit role (opens JSON editor)"},
+				{"D", "Delete role (with confirmation)"},
+				{"c (token roles)", "Quick-create token from selected role"},
+				{"j / k (in view)", "Scroll role data"},
+				{"Esc / h", "Back to previous level"},
+			},
+		},
+		{
+			title: "Tokens (from root level)",
+			bindings: []helpBinding{
+				{"j / k", "Navigate token accessors"},
+				{"Enter / l", "View token metadata"},
+				{"a", "Create custom token (opens JSON editor)"},
+				{"D", "Revoke token (with confirmation)"},
+				{"Esc / h", "Back to root level"},
 			},
 		},
 		{

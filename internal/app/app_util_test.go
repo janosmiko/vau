@@ -63,11 +63,12 @@ func TestHandleInputKey_Esc_WithSecret(t *testing.T) {
 	ti := textinput.New()
 	ti.Focus()
 	m := &Model{
-		mode:        model.ModeInput,
-		textInput:   ti,
-		inputAction: model.InputEditValue,
-		inputBuffer: "leftover",
-		secret:      &model.Secret{Path: "secret/foo"},
+		mode:          model.ModeInput,
+		prevInputMode: model.ModeSecret,
+		textInput:     ti,
+		inputAction:   model.InputEditValue,
+		inputBuffer:   "leftover",
+		secret:        &model.Secret{Path: "secret/foo"},
 	}
 
 	result, cmd := m.handleInputKey(tea.KeyMsg{Type: tea.KeyEsc})

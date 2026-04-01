@@ -380,3 +380,43 @@ func renderSecretJSON(secret *model.Secret, height int) string {
 func DimText(text string, _ int) string {
 	return HelpDescStyle.Render(text)
 }
+
+// threeColumnLayout holds pre-computed dimensions for the standard three-column layout.
+type threeColumnLayout struct {
+	header    string
+	leftW     int
+	midW      int
+	rightW    int
+	colHeight int
+}
+
+// computeThreeColumnLayout builds the header (breadcrumb + tab bar) and column dimensions.
+func computeThreeColumnLayout(breadcrumb string, version string, tabLabels []string, activeTab int, width, height int) threeColumnLayout {
+	breadcrumbRendered := BreadcrumbStyle.Render(" " + breadcrumb)
+	versionRendered := StatusStyle.Render("vau " + version)
+	padding := max(width-lipgloss.Width(breadcrumbRendered)-lipgloss.Width(versionRendered), 1)
+	breadcrumbLine := breadcrumbRendered + strings.Repeat(" ", padding) + versionRendered
+
+	headerLines := 1
+	var header string
+	if len(tabLabels) > 1 {
+		header = breadcrumbLine + "\n" + RenderTabBar(tabLabels, activeTab, width)
+		headerLines = 2
+	} else {
+		header = breadcrumbLine
+	}
+
+	usable := width - 6
+	leftW := max(usable*12/100, 10)
+	midW := max(usable*51/100, 10)
+	rightW := max(usable-leftW-midW, 10)
+	colHeight := height - 3 - headerLines
+
+	return threeColumnLayout{
+		header:    header,
+		leftW:     leftW,
+		midW:      midW,
+		rightW:    rightW,
+		colHeight: colHeight,
+	}
+}

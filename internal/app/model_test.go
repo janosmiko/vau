@@ -661,7 +661,8 @@ func TestMountEntries(t *testing.T) {
 	m.mounts = []string{"secret", "kv", "pki"}
 
 	entries := m.mountEntries()
-	require.Len(t, entries, 3)
+	// 3 mounts + 6 access categories
+	require.Len(t, entries, 9)
 
 	assert.Equal(t, "secret/", entries[0].Name)
 	assert.True(t, entries[0].IsDir)
@@ -669,6 +670,12 @@ func TestMountEntries(t *testing.T) {
 	assert.True(t, entries[1].IsDir)
 	assert.Equal(t, "pki/", entries[2].Name)
 	assert.True(t, entries[2].IsDir)
+	// Access categories
+	assert.Equal(t, "[Policies]", entries[3].Name)
+	assert.Equal(t, "[Auth Methods]", entries[4].Name)
+	assert.Equal(t, "[Entities]", entries[5].Name)
+	assert.Equal(t, "[Groups]", entries[6].Name)
+	assert.Equal(t, "[Leases]", entries[7].Name)
 }
 
 func TestMountEntries_Empty(t *testing.T) {
@@ -676,7 +683,9 @@ func TestMountEntries_Empty(t *testing.T) {
 	m.mounts = nil
 
 	entries := m.mountEntries()
-	assert.Empty(t, entries)
+	// Still has the 6 access categories
+	require.Len(t, entries, 6)
+	assert.Equal(t, "[Policies]", entries[0].Name)
 }
 
 // ---------------------------------------------------------------------------
@@ -982,10 +991,12 @@ func TestLeftPaneEntries_AtRoot(t *testing.T) {
 	m.parentList = []model.Entry{{Name: "should-not-appear"}}
 
 	entries := m.leftPaneEntries()
-	require.Len(t, entries, 2)
+	// 2 mounts + 6 access categories
+	require.Len(t, entries, 8)
 	assert.Equal(t, "secret/", entries[0].Name)
 	assert.True(t, entries[0].IsDir)
 	assert.Equal(t, "kv/", entries[1].Name)
+	assert.Equal(t, "[Policies]", entries[2].Name)
 }
 
 func TestLeftPaneEntries_NonRoot(t *testing.T) {

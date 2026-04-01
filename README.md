@@ -102,6 +102,8 @@ vau --version    # Print version information
 
 - **Three-column explorer** - Parent / current / preview layout inspired by [yazi](https://github.com/sxyazi/yazi)
 - **KV v1 and v2** - Auto-detects engine version per mount
+- **Policy management** - Browse, create, edit, and delete ACL policies (enter `[Policies]` at root level)
+- **Auth / Roles management** - Browse, create, edit, and delete auth method roles (enter `[Auth Methods]` at root level)
 - **Secret popup** - View, edit, add, and delete key-value pairs inline
 - **External editor** - Edit secrets as JSON in your preferred editor (`e` in JSON view, `A` to create)
 - **Clipboard** - Copy/paste values to system clipboard (`y`/`p`), copy entire secret as JSON, YAML, or dotenv (`Y`)
@@ -249,6 +251,35 @@ Vim-style named marks for quick navigation. Press `m` followed by a slot key (`a
 | `D` | Delete selected (in overlay) |
 | `Ctrl+X` | Delete all (in overlay) |
 | `Esc` | Close overlay |
+
+### Policies
+
+At root level, enter `[Policies]` to browse ACL policies.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate policies |
+| `Enter` / `l` | View policy HCL |
+| `a` | Create new policy (opens editor with HCL template) |
+| `e` (in view) | Edit policy (opens editor) |
+| `D` | Delete policy (with confirmation) |
+| `j` / `k` (in view) | Scroll HCL content |
+| `Ctrl+D` / `Ctrl+U` | Half-page scroll |
+| `Esc` / `h` | Back to root level |
+
+### Auth Methods / Roles
+
+At root level, enter `[Auth Methods]` to browse auth methods and their roles.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate auth methods or roles |
+| `Enter` / `l` | Enter auth method or view role detail |
+| `a` | Create new role (opens JSON editor) |
+| `e` (in view) | Edit role (opens JSON editor) |
+| `D` | Delete role (with confirmation) |
+| `j` / `k` (in view) | Scroll role data |
+| `Esc` / `h` | Back to previous level |
 
 ### Colorscheme Picker (`T`)
 
