@@ -46,6 +46,20 @@ func TestExplorerKeyPrecedence_RemappedBindings(t *testing.T) {
 	})
 }
 
+func TestPasteSecretAcrossMountsIsRejected(t *testing.T) {
+	m := newTestModel()
+	m.mode = model.ModeExplorer
+	m.yankedSecrets = []*model.Secret{{Path: "a"}}
+	m.yankIsCut = true
+	m.yankMount = "secret"
+	m.client = m.client.WithMount("other")
+
+	_, cmd := m.handleExplorerKey(keyMsg("p"))
+
+	assert.Nil(t, cmd)
+	assert.Equal(t, "Cannot paste across different mounts", m.errMsg)
+}
+
 func TestRoleListKeyPrecedence_QuitBeatsNav(t *testing.T) {
 	m := newTestModel()
 	m.roles = []model.Entry{{Name: "a"}, {Name: "b"}}

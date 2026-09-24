@@ -459,11 +459,12 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case matchKey(key, m.keys.Paste):
+		// Paste reads the source through the current mount, so a yank from another mount hits the wrong secret.
+		if m.yankMount != "" && m.yankMount != m.client.Mount() {
+			m.errMsg = "Cannot paste across different mounts"
+			return m, nil, true
+		}
 		if m.yankIsDir {
-			if m.yankMount != "" && m.yankMount != m.client.Mount() {
-				m.errMsg = "Cannot paste across different mounts"
-				return m, nil, true
-			}
 			cmd := m.pasteSecrets()
 			if m.yankIsCut {
 				m.yankIsCut = false
