@@ -2,15 +2,12 @@ package vault
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/janosmiko/vau/internal/model"
 
@@ -30,12 +27,6 @@ type Client struct {
 	raw           *vaultapi.Client
 	mount         string
 	mountVersions *versionCache
-}
-
-// versionCache maps mount path -> KV version (1 or 2). Copies of a Client share it.
-type versionCache struct {
-	mu sync.Mutex
-	m  map[string]int
 }
 
 // NewClient creates a new Vault client from environment variables.
@@ -85,42 +76,6 @@ func (c *Client) WithMount(mount string) *Client {
 	cp := *c
 	cp.mount = strings.TrimSuffix(mount, "/")
 	return &cp
-}
-
-// getMountVersion detects and caches the KV engine version for the given mount.
-// It queries sys/mounts/{mount} and inspects options.version.
-// Returns 1 for KV v1 or 2 for KV v2 (the default).
-func (c *Client) getMountVersion(mount string) int {
-	c.mountVersions.mu.Lock()
-	v, ok := c.mountVersions.m[mount]
-	c.mountVersions.mu.Unlock()
-	if ok {
-		return v
-	}
-	v = 2
-	secret, err := c.raw.Logical().Read("sys/mounts/" + mount)
-	var respErr *vaultapi.ResponseError
-	if err != nil && (!errors.As(err, &respErr) || respErr.StatusCode != http.StatusForbidden) {
-		// Cache a 403, because it does not go away. Any other error can be transient,
-		// and a cached v2 fallback would send all later KV v1 calls to v2 paths.
-		return v
-	}
-	if err == nil && secret != nil {
-		if options, ok := secret.Data["options"].(map[string]any); ok {
-			if version, ok := options["version"].(string); ok && version == "1" {
-				v = 1
-			}
-		}
-	}
-	c.mountVersions.mu.Lock()
-	c.mountVersions.m[mount] = v
-	c.mountVersions.mu.Unlock()
-	return v
-}
-
-// IsKV1 reports whether the current mount uses the KV v1 engine.
-func (c *Client) IsKV1() bool {
-	return c.getMountVersion(c.mount) == 1
 }
 
 // ListMounts returns available KV secret engine mounts.
@@ -195,7 +150,7 @@ func (c *Client) List(path string) ([]model.Entry, error) {
 // ListCtx is List with a context that can cancel the request.
 func (c *Client) ListCtx(ctx context.Context, path string) ([]model.Entry, error) {
 	var apiPath string
-	if c.getMountVersion(c.mount) == 1 {
+	if c.getMountVersionCtx(ctx, c.mount) == 1 {
 		apiPath = fmt.Sprintf("%s/%s", c.mount, path)
 	} else {
 		apiPath = fmt.Sprintf("%s/metadata/%s", c.mount, path)

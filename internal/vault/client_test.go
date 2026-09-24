@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -127,15 +128,33 @@ func TestGetMountVersion_TransientErrorIsNotCached(t *testing.T) {
 	assert.True(t, c.IsKV1(), "a transient failure must not pin the v2 fallback")
 }
 
-func TestGetMountVersion_ForbiddenIsCached(t *testing.T) {
-	var probes atomic.Int32
-	c := newServerClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		probes.Add(1)
-		w.WriteHeader(http.StatusForbidden)
+func TestGetMountVersion_ClientErrorIsCached(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			var probes atomic.Int32
+			c := newServerClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				probes.Add(1)
+				w.WriteHeader(status)
+			})
+
+			c.IsKV1()
+			c.IsKV1()
+
+			assert.Equal(t, int32(1), probes.Load(), "a 4xx does not go away, so it must not trigger a probe on every call")
+		})
+	}
+}
+
+func TestCountRecursive_CancelInterruptsBlockedMountProbe(t *testing.T) {
+	c := newServerClient(t, func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
 	})
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
 
-	c.IsKV1()
-	c.IsKV1()
+	start := time.Now()
+	_, err := c.CountRecursive(ctx, "dir")
 
-	assert.Equal(t, int32(1), probes.Load(), "a permission error must not trigger a probe on every call")
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(start), 5*time.Second)
 }
