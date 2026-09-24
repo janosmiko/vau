@@ -372,7 +372,7 @@ func (m *Model) handleExplorerModeKey(key string) (tea.Model, tea.Cmd, bool) {
 
 	case matchKey(key, m.keys.BookmarkSave):
 		m.markPending = true
-		m.status = "Set mark: [a-z, 0-9]"
+		m.status = "Set mark: [a-z, 0-9] (not j/k/l)"
 		return m, nil, true
 
 	case matchKey(key, m.keys.BookmarkShow):
