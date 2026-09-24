@@ -320,7 +320,10 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		// Save the current input and commit all changes
-		m.applyCurrentEditInput()
+		if !m.applyCurrentEditInput() {
+			// Rename collision: stay in edit mode so the user can fix the name.
+			return m, nil
+		}
 		m.textInput.Blur()
 
 		origKey := m.secretEditOrigKey
@@ -377,7 +380,10 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // switchEditColumn saves the current column's textinput and switches to the other column.
 func (m *Model) switchEditColumn() (tea.Model, tea.Cmd) {
-	m.applyCurrentEditInput()
+	if !m.applyCurrentEditInput() {
+		// Rename collision: stay on the key column so the user can fix it.
+		return m, nil
+	}
 
 	// Toggle column
 	if m.secretEditColumn == 0 {
@@ -394,13 +400,19 @@ func (m *Model) switchEditColumn() (tea.Model, tea.Cmd) {
 	return m, textinput.Blink
 }
 
-// applyCurrentEditInput writes the textinput value back to the appropriate field.
-func (m *Model) applyCurrentEditInput() {
+// applyCurrentEditInput writes the textinput value back to the appropriate
+// field. It returns false without changing anything if a key rename would
+// collide with an existing key.
+func (m *Model) applyCurrentEditInput() bool {
 	if m.secretEditColumn == 0 {
 		// Editing key column — rename in-place
 		newKey := m.textInput.Value()
 		oldKey := m.secretEditKey
 		if newKey != oldKey {
+			if _, exists := m.secret.Data[newKey]; exists {
+				m.errMsg = fmt.Sprintf("Key %q already exists", newKey)
+				return false
+			}
 			// Update the key in the Keys slice (preserve order)
 			for i, k := range m.secret.Keys {
 				if k == oldKey {
@@ -418,6 +430,7 @@ func (m *Model) applyCurrentEditInput() {
 		// Editing value column
 		m.secret.Data[m.secretEditKey] = m.textInput.Value()
 	}
+	return true
 }
 
 // removeLastEmptyKey removes the last occurrence of an empty key from secret.Keys.
