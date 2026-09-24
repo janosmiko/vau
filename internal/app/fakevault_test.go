@@ -67,14 +67,11 @@ func (fv *fakeVault) serve(w http.ResponseWriter, r *http.Request) {
 	defer fv.mu.Unlock()
 
 	p := strings.TrimPrefix(r.URL.Path, "/v1/")
-	if p == "sys/mounts/secret" {
+	if strings.HasPrefix(p, "sys/mounts/") {
 		writeJSON(w, map[string]any{"data": map[string]any{"type": "kv", "options": map[string]any{"version": "1"}}})
 		return
 	}
-	if !strings.HasPrefix(p, "secret/") {
-		http.NotFound(w, r)
-		return
-	}
+	// Mount "secret" keys paths without a prefix. Any other mount keeps its "<mount>/" prefix.
 	p = strings.TrimPrefix(p, "secret/")
 
 	switch {

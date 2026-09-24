@@ -465,9 +465,10 @@ func (m *Model) renameKey(oldKey, newKey, val string, snapData map[string]string
 
 	// Copy updated state for the async Vault write.
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{

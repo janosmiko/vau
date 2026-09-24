@@ -11,8 +11,9 @@ import (
 // --- Version history ---
 
 func (m *Model) loadVersionHistory(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		versions, err := m.client.ReadVersionMetadata(path)
+		versions, err := client.ReadVersionMetadata(path)
 		return versionHistoryMsg{path: path, versions: versions, err: err}
 	}
 }
@@ -36,8 +37,9 @@ func (m *Model) handleVersionHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			sv := m.versionHistory[m.versionCursor]
 			ver, _ := strconv.Atoi(sv.Version)
 			path := m.versionPath
+			client := m.client
 			return m, func() tea.Msg {
-				secret, err := m.client.ReadVersion(path, ver)
+				secret, err := client.ReadVersion(path, ver)
 				return versionDetailMsg{version: ver, secret: secret, err: err}
 			}
 		}
@@ -78,12 +80,13 @@ func (m *Model) handleVersionHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) destroyVersion(path string, version int) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		if err := m.client.DestroyVersions(path, []int{version}); err != nil {
+		if err := client.DestroyVersions(path, []int{version}); err != nil {
 			return errorMsg(fmt.Sprintf("destroy version %d: %v", version, err))
 		}
 		// Reload version history.
-		versions, err := m.client.ReadVersionMetadata(path)
+		versions, err := client.ReadVersionMetadata(path)
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Destroyed version %d (reload failed: %v)", version, err))
 		}
@@ -92,13 +95,14 @@ func (m *Model) destroyVersion(path string, version int) tea.Cmd {
 }
 
 func (m *Model) destroyOldVersions(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		count, err := m.client.DestroyOldVersions(path)
+		count, err := client.DestroyOldVersions(path)
 		if err != nil {
 			return errorMsg(fmt.Sprintf("destroy old versions: %v", err))
 		}
 		// Reload version history.
-		versions, err := m.client.ReadVersionMetadata(path)
+		versions, err := client.ReadVersionMetadata(path)
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Destroyed %d old versions (reload failed: %v)", count, err))
 		}
@@ -109,6 +113,7 @@ func (m *Model) destroyOldVersions(path string) tea.Cmd {
 // --- Undo/redo execution ---
 
 func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
 		var reverse model.UndoAction
 		var reloadSecret *model.Secret
@@ -116,8 +121,8 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 		switch action.Type {
 		case model.UndoCreateSecret:
 			// Undo create = delete. Read current data for redo.
-			secret, _ := m.client.Read(action.Path)
-			if err := m.client.Delete(action.Path); err != nil {
+			secret, _ := client.Read(action.Path)
+			if err := client.Delete(action.Path); err != nil {
 				return errorMsg("undo: " + err.Error())
 			}
 			data := action.Data
@@ -130,7 +135,7 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 
 		case model.UndoDeleteSecret:
 			// Undo delete/cut = recreate
-			if err := m.client.Write(action.Path, action.Data); err != nil {
+			if err := client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("undo: " + err.Error())
 			}
 			reverse = model.UndoAction{Type: model.UndoCreateSecret, Description: action.Description, Path: action.Path, Data: copyMap(action.Data), Keys: copySlice(action.Keys)}
@@ -138,15 +143,15 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 		case model.UndoRenameSecret:
 			// Undo rename: move from Path (current) back to OldPath (original).
 			// Use MoveRecursive to handle both files and directories.
-			if _, err := m.client.MoveRecursive(action.Path, action.OldPath); err != nil {
+			if _, err := client.MoveRecursive(action.Path, action.OldPath); err != nil {
 				return errorMsg("undo: " + err.Error())
 			}
 			reverse = model.UndoAction{Type: model.UndoRenameSecret, Description: action.Description, Path: action.OldPath, OldPath: action.Path}
 
 		case model.UndoPasteSecret:
 			// Undo paste = delete the pasted secret. Read data first for redo.
-			secret, _ := m.client.Read(action.Path)
-			if err := m.client.Delete(action.Path); err != nil {
+			secret, _ := client.Read(action.Path)
+			if err := client.Delete(action.Path); err != nil {
 				return errorMsg("undo: " + err.Error())
 			}
 			data := action.Data
@@ -160,7 +165,7 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 		case model.UndoCutPaste:
 			// Undo cut+paste: if Data is nil it was a directory move, use MoveRecursive.
 			if action.Data == nil {
-				if _, err := m.client.MoveRecursive(action.Path, action.OldPath); err != nil {
+				if _, err := client.MoveRecursive(action.Path, action.OldPath); err != nil {
 					return errorMsg("undo: " + err.Error())
 				}
 				reverse = model.UndoAction{
@@ -170,10 +175,10 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 					OldPath:     action.Path,
 				}
 			} else {
-				if err := m.client.Write(action.OldPath, action.Data); err != nil {
+				if err := client.Write(action.OldPath, action.Data); err != nil {
 					return errorMsg("undo: " + err.Error())
 				}
-				if err := m.client.Delete(action.Path); err != nil {
+				if err := client.Delete(action.Path); err != nil {
 					return errorMsg("undo: " + err.Error())
 				}
 				reverse = model.UndoAction{
@@ -188,8 +193,8 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 
 		case model.UndoEditSecret:
 			// Undo edit = restore snapshot. Read current state for redo.
-			current, _ := m.client.Read(action.Path)
-			if err := m.client.Write(action.Path, action.Data); err != nil {
+			current, _ := client.Read(action.Path)
+			if err := client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("undo: " + err.Error())
 			}
 			redoData := action.Data
@@ -210,6 +215,7 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 }
 
 func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
 		var reverse model.UndoAction
 		var reloadSecret *model.Secret
@@ -217,8 +223,8 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 		switch action.Type {
 		case model.UndoCreateSecret:
 			// Redo of undo-delete = delete again
-			secret, _ := m.client.Read(action.Path)
-			if err := m.client.Delete(action.Path); err != nil {
+			secret, _ := client.Read(action.Path)
+			if err := client.Delete(action.Path); err != nil {
 				return errorMsg("redo: " + err.Error())
 			}
 			data := action.Data
@@ -231,21 +237,21 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 
 		case model.UndoDeleteSecret:
 			// Redo of undo-create = recreate
-			if err := m.client.Write(action.Path, action.Data); err != nil {
+			if err := client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("redo: " + err.Error())
 			}
 			reverse = model.UndoAction{Type: model.UndoCreateSecret, Description: action.Description, Path: action.Path, Data: copyMap(action.Data), Keys: copySlice(action.Keys)}
 
 		case model.UndoRenameSecret:
 			// Redo rename: use MoveRecursive to handle both files and directories.
-			if _, err := m.client.MoveRecursive(action.Path, action.OldPath); err != nil {
+			if _, err := client.MoveRecursive(action.Path, action.OldPath); err != nil {
 				return errorMsg("redo: " + err.Error())
 			}
 			reverse = model.UndoAction{Type: model.UndoRenameSecret, Description: action.Description, Path: action.OldPath, OldPath: action.Path}
 
 		case model.UndoPasteSecret:
 			// Redo paste = recreate the pasted secret
-			if err := m.client.Write(action.Path, action.Data); err != nil {
+			if err := client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("redo: " + err.Error())
 			}
 			reverse = model.UndoAction{Type: model.UndoPasteSecret, Description: action.Description, Path: action.Path, Data: copyMap(action.Data), Keys: copySlice(action.Keys)}
@@ -253,7 +259,7 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 		case model.UndoCutPaste:
 			// Redo cut+paste: if Data is nil it was a directory move, use MoveRecursive.
 			if action.Data == nil {
-				if _, err := m.client.MoveRecursive(action.Path, action.OldPath); err != nil {
+				if _, err := client.MoveRecursive(action.Path, action.OldPath); err != nil {
 					return errorMsg("redo: " + err.Error())
 				}
 				reverse = model.UndoAction{
@@ -263,10 +269,10 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 					OldPath:     action.Path,
 				}
 			} else {
-				if err := m.client.Write(action.Path, action.Data); err != nil {
+				if err := client.Write(action.Path, action.Data); err != nil {
 					return errorMsg("redo: " + err.Error())
 				}
-				if err := m.client.Delete(action.OldPath); err != nil {
+				if err := client.Delete(action.OldPath); err != nil {
 					return errorMsg("redo: " + err.Error())
 				}
 				reverse = model.UndoAction{
@@ -281,8 +287,8 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 
 		case model.UndoEditSecret:
 			// Redo edit = apply the redo snapshot
-			current, _ := m.client.Read(action.Path)
-			if err := m.client.Write(action.Path, action.Data); err != nil {
+			current, _ := client.Read(action.Path)
+			if err := client.Write(action.Path, action.Data); err != nil {
 				return errorMsg("redo: " + err.Error())
 			}
 			undoData := action.Data

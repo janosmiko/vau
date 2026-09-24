@@ -360,8 +360,9 @@ func (m *Model) handleExplorerModeKey(key string) (tea.Model, tea.Cmd, bool) {
 		entry := m.selectedEntry()
 		if entry != nil && !entry.IsDir {
 			path := m.currentPath() + entry.Name
+			client := m.client
 			return m, func() tea.Msg {
-				secret, err := m.client.Read(path)
+				secret, err := client.Read(path)
 				if err != nil {
 					return errorMsg(err.Error())
 				}

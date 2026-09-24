@@ -9,27 +9,30 @@ import (
 // --- Entity loaders ---
 
 func (m *Model) loadEntities() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		entities, err := m.client.ListEntities()
+		entities, err := client.ListEntities()
 		return entityListMsg{entities: entities, err: err}
 	}
 }
 
 func (m *Model) loadEntityData(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.GetEntity(name)
+		data, err := client.GetEntity(name)
 		if err == nil && data != nil {
-			m.client.EnrichEntityAliases(data)
+			client.EnrichEntityAliases(data)
 		}
 		return entityDataMsg{name: name, data: data, err: err}
 	}
 }
 
 func (m *Model) loadEntityDataPreview(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, _ := m.client.GetEntity(name)
+		data, _ := client.GetEntity(name)
 		if data != nil {
-			m.client.EnrichEntityAliases(data)
+			client.EnrichEntityAliases(data)
 		}
 		return entityDataPreviewMsg{name: name, data: data}
 	}
@@ -38,22 +41,25 @@ func (m *Model) loadEntityDataPreview(name string) tea.Cmd {
 // --- Group loaders ---
 
 func (m *Model) loadGroups() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		groups, err := m.client.ListGroups()
+		groups, err := client.ListGroups()
 		return groupListMsg{groups: groups, err: err}
 	}
 }
 
 func (m *Model) loadGroupData(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.GetGroup(name)
+		data, err := client.GetGroup(name)
 		return groupDataMsg{name: name, data: data, err: err}
 	}
 }
 
 func (m *Model) loadGroupDataPreview(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, _ := m.client.GetGroup(name)
+		data, _ := client.GetGroup(name)
 		return groupDataPreviewMsg{name: name, data: data}
 	}
 }

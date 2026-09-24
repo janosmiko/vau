@@ -20,8 +20,9 @@ func (m *Model) createPolicyWithEditor(name string) tea.Cmd {
 
 // editPolicyFromList fetches the policy content, then opens editor.
 func (m *Model) editPolicyFromList(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		content, err := m.client.GetPolicy(name)
+		content, err := client.GetPolicy(name)
 		if err != nil {
 			return errorMsg(fmt.Sprintf("reading policy %q: %v", name, err))
 		}
@@ -32,8 +33,9 @@ func (m *Model) editPolicyFromList(name string) tea.Cmd {
 
 // editRoleFromList fetches the role data, then opens editor.
 func (m *Model) editRoleFromList(authPath, name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.GetRole(authPath, name)
+		data, err := client.GetRole(authPath, name)
 		if err != nil {
 			return errorMsg(fmt.Sprintf("reading role %q: %v", name, err))
 		}
@@ -52,8 +54,9 @@ func (m *Model) editPolicyInEditor(name, content string) tea.Cmd {
 }
 
 func (m *Model) deletePolicy(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		err := m.client.DeletePolicy(name)
+		err := client.DeletePolicy(name)
 		return policyDeletedMsg{name: name, err: err}
 	}
 }
@@ -163,8 +166,9 @@ func (m *Model) editRoleInEditor(authPath, name string, data map[string]any) tea
 }
 
 func (m *Model) deleteRole(authPath, name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		err := m.client.DeleteRole(authPath, name)
+		err := client.DeleteRole(authPath, name)
 		return roleDeletedMsg{authPath: authPath, name: name, err: err}
 	}
 }

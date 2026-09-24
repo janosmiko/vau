@@ -83,8 +83,9 @@ func (m *Model) refresh() tea.Cmd {
 // --- Vault commands ---
 
 func (m *Model) loadMounts() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		mounts, err := m.client.ListMounts()
+		mounts, err := client.ListMounts()
 		return mountsResultMsg{mounts: mounts, err: err}
 	}
 }
@@ -104,8 +105,9 @@ func (m *Model) loadMountPreview() tea.Cmd {
 
 	// KV mount preview
 	mount := strings.TrimSuffix(selected.Name, "/")
+	client := m.client
 	return func() tea.Msg {
-		entries, err := m.client.ListWithMount(mount, "")
+		entries, err := client.ListWithMount(mount, "")
 		if err != nil {
 			return listResultMsg{path: "@@mount_preview@@", entries: nil, err: err}
 		}
@@ -115,10 +117,11 @@ func (m *Model) loadMountPreview() tea.Cmd {
 
 // loadAccessCategoryPreview loads a preview for access categories at root level.
 func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
+	client := m.client
 	switch name {
 	case accessPolicies:
 		return func() tea.Msg {
-			policies, _ := m.client.ListPolicies()
+			policies, _ := client.ListPolicies()
 			entries := make([]model.Entry, len(policies))
 			for i, p := range policies {
 				entries[i] = model.Entry{Name: p}
@@ -127,17 +130,17 @@ func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
 		}
 	case accessAuthMethods:
 		return func() tea.Msg {
-			methods, _ := m.client.ListAuthMethods()
+			methods, _ := client.ListAuthMethods()
 			return listResultMsg{path: "@@mount_preview@@", entries: methods}
 		}
 	case accessEntities:
 		return func() tea.Msg {
-			entries, _ := m.client.ListEntities()
+			entries, _ := client.ListEntities()
 			return listResultMsg{path: "@@mount_preview@@", entries: entries}
 		}
 	case accessGroups:
 		return func() tea.Msg {
-			entries, _ := m.client.ListGroups()
+			entries, _ := client.ListGroups()
 			return listResultMsg{path: "@@mount_preview@@", entries: entries}
 		}
 	case accessLeases:
@@ -147,7 +150,7 @@ func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
 		}
 	case accessTokens:
 		return func() tea.Msg {
-			entries, _ := m.client.ListTokenAccessors()
+			entries, _ := client.ListTokenAccessors()
 			return listResultMsg{path: "@@mount_preview@@", entries: entries}
 		}
 	}
@@ -155,16 +158,18 @@ func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
 }
 
 func (m *Model) listDir(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		entries, err := m.client.List(path)
+		entries, err := client.List(path)
 		return listResultMsg{path: path, entries: entries, err: err}
 	}
 }
 
 func (m *Model) listParent() tea.Cmd {
 	pp := m.parentPath()
+	client := m.client
 	return func() tea.Msg {
-		entries, err := m.client.List(pp)
+		entries, err := client.List(pp)
 		if err != nil {
 			return nil
 		}
@@ -173,6 +178,7 @@ func (m *Model) listParent() tea.Cmd {
 }
 
 func (m *Model) loadPreview() tea.Cmd {
+	client := m.client
 	entry := m.selectedEntry()
 	if entry == nil {
 		m.previewMode = model.PreviewHidden
@@ -186,7 +192,7 @@ func (m *Model) loadPreview() tea.Cmd {
 		m.previewSecret = nil
 		path := m.currentPath() + entry.Name
 		return func() tea.Msg {
-			entries, err := m.client.List(path)
+			entries, err := client.List(path)
 			if err != nil {
 				return errorMsg(err.Error())
 			}
@@ -202,14 +208,15 @@ func (m *Model) loadPreview() tea.Cmd {
 	}
 	m.previewEntries = nil
 	return func() tea.Msg {
-		secret, err := m.client.Read(path)
+		secret, err := client.Read(path)
 		return secretResultMsg{path: path, secret: secret, err: err}
 	}
 }
 
 func (m *Model) readSecret(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		secret, err := m.client.Read(path)
+		secret, err := client.Read(path)
 		if err != nil {
 			return errorMsg(err.Error())
 		}

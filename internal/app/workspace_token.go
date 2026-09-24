@@ -10,36 +10,41 @@ import (
 )
 
 func (m *Model) loadTokenAccessors() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		accessors, err := m.client.ListTokenAccessors()
+		accessors, err := client.ListTokenAccessors()
 		return tokenListMsg{accessors: accessors, err: err}
 	}
 }
 
 func (m *Model) loadTokenData(accessor string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.LookupAccessor(accessor)
+		data, err := client.LookupAccessor(accessor)
 		return tokenDataMsg{accessor: accessor, data: data, err: err}
 	}
 }
 
 func (m *Model) loadTokenDataPreview(accessor string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, _ := m.client.LookupAccessor(accessor)
+		data, _ := client.LookupAccessor(accessor)
 		return tokenDataPreviewMsg{accessor: accessor, data: data}
 	}
 }
 
 func (m *Model) createTokenFromRole(role string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.CreateTokenWithRole(role, nil)
+		data, err := client.CreateTokenWithRole(role, nil)
 		return tokenCreatedMsg{data: data, err: err}
 	}
 }
 
 func (m *Model) revokeToken(accessor string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		err := m.client.RevokeAccessor(accessor)
+		err := client.RevokeAccessor(accessor)
 		return tokenRevokedMsg{accessor: accessor, err: err}
 	}
 }

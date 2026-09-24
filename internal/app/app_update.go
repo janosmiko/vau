@@ -326,8 +326,9 @@ func (m *Model) updateSecretEditMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		// New secret creation via editor
 		if msg.newSecretPath != "" {
 			path := msg.newSecretPath
+			client := m.client
 			return m, func() tea.Msg {
-				if err := m.client.Write(path, msg.data); err != nil {
+				if err := client.Write(path, msg.data); err != nil {
 					return errorMsg(err.Error())
 				}
 				return undoableStatusMsg{

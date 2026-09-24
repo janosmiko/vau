@@ -356,8 +356,9 @@ func (m *Model) loadJumpCompletions() tea.Cmd {
 		prefix = input
 	}
 
+	client := m.client
 	return func() tea.Msg {
-		entries, err := m.client.List(parentPath)
+		entries, err := client.List(parentPath)
 		if err != nil || entries == nil {
 			return jumpCompletionsMsg{input: input}
 		}

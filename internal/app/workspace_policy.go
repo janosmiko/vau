@@ -13,57 +13,65 @@ import (
 // --- Async loaders ---
 
 func (m *Model) loadPolicies() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		policies, err := m.client.ListPolicies()
+		policies, err := client.ListPolicies()
 		return policyListMsg{policies: policies, err: err}
 	}
 }
 
 func (m *Model) loadPolicy(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		content, err := m.client.GetPolicy(name)
+		content, err := client.GetPolicy(name)
 		return policyContentMsg{name: name, content: content, err: err}
 	}
 }
 
 func (m *Model) loadPolicyPreview(name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		content, _ := m.client.GetPolicy(name)
+		content, _ := client.GetPolicy(name)
 		return policyPreviewMsg{name: name, content: content}
 	}
 }
 
 func (m *Model) loadAuthMethods() tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		methods, err := m.client.ListAuthMethods()
+		methods, err := client.ListAuthMethods()
 		return authMethodsMsg{methods: methods, err: err}
 	}
 }
 
 func (m *Model) loadRoles(authPath string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		roles, err := m.client.ListRoles(authPath)
+		roles, err := client.ListRoles(authPath)
 		return roleListMsg{authPath: authPath, roles: roles, err: err}
 	}
 }
 
 func (m *Model) loadRolePreview(authPath string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		roles, _ := m.client.ListRoles(authPath)
+		roles, _ := client.ListRoles(authPath)
 		return rolePreviewMsg{authPath: authPath, roles: roles}
 	}
 }
 
 func (m *Model) loadRole(authPath, name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, err := m.client.GetRole(authPath, name)
+		data, err := client.GetRole(authPath, name)
 		return roleDataMsg{authPath: authPath, name: name, data: data, err: err}
 	}
 }
 
 func (m *Model) loadRoleDataPreview(authPath, name string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		data, _ := m.client.GetRole(authPath, name)
+		data, _ := client.GetRole(authPath, name)
 		return roleDataPreviewMsg{name: name, data: data}
 	}
 }
