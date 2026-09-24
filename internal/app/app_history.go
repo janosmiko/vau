@@ -170,10 +170,10 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 					OldPath:     action.Path,
 				}
 			} else {
-				if err := m.client.Delete(action.Path); err != nil {
+				if err := m.client.Write(action.OldPath, action.Data); err != nil {
 					return errorMsg("undo: " + err.Error())
 				}
-				if err := m.client.Write(action.OldPath, action.Data); err != nil {
+				if err := m.client.Delete(action.Path); err != nil {
 					return errorMsg("undo: " + err.Error())
 				}
 				reverse = model.UndoAction{
