@@ -109,9 +109,9 @@ func (m *Model) loadMountPreview() tea.Cmd {
 	return func() tea.Msg {
 		entries, err := client.ListWithMount(mount, "")
 		if err != nil {
-			return listResultMsg{path: "@@mount_preview@@", entries: nil, err: err}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: nil, err: err}
 		}
-		return listResultMsg{path: "@@mount_preview@@", entries: entries}
+		return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: entries}
 	}
 }
 
@@ -126,32 +126,32 @@ func (m *Model) loadAccessCategoryPreview(name string) tea.Cmd {
 			for i, p := range policies {
 				entries[i] = model.Entry{Name: p}
 			}
-			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: entries}
 		}
 	case accessAuthMethods:
 		return func() tea.Msg {
 			methods, _ := client.ListAuthMethods()
-			return listResultMsg{path: "@@mount_preview@@", entries: methods}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: methods}
 		}
 	case accessEntities:
 		return func() tea.Msg {
 			entries, _ := client.ListEntities()
-			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: entries}
 		}
 	case accessGroups:
 		return func() tea.Msg {
 			entries, _ := client.ListGroups()
-			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: entries}
 		}
 	case accessLeases:
 		return func() tea.Msg {
 			// Leases require prefix — show empty for now
-			return listResultMsg{path: "@@mount_preview@@", entries: nil}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: nil}
 		}
 	case accessTokens:
 		return func() tea.Msg {
 			entries, _ := client.ListTokenAccessors()
-			return listResultMsg{path: "@@mount_preview@@", entries: entries}
+			return listResultMsg{mount: client.Mount(), path: "@@mount_preview@@", entries: entries}
 		}
 	}
 	return nil
@@ -161,7 +161,7 @@ func (m *Model) listDir(path string) tea.Cmd {
 	client := m.client
 	return func() tea.Msg {
 		entries, err := client.List(path)
-		return listResultMsg{path: path, entries: entries, err: err}
+		return listResultMsg{mount: client.Mount(), path: path, entries: entries, err: err}
 	}
 }
 
@@ -173,7 +173,7 @@ func (m *Model) listParent() tea.Cmd {
 		if err != nil {
 			return nil
 		}
-		return listResultMsg{path: pp, entries: entries}
+		return listResultMsg{mount: client.Mount(), path: pp, entries: entries}
 	}
 }
 
@@ -196,7 +196,7 @@ func (m *Model) loadPreview() tea.Cmd {
 			if err != nil {
 				return errorMsg(err.Error())
 			}
-			return listResultMsg{path: path, entries: entries}
+			return listResultMsg{mount: client.Mount(), path: path, entries: entries}
 		}
 	}
 
@@ -209,7 +209,7 @@ func (m *Model) loadPreview() tea.Cmd {
 	m.previewEntries = nil
 	return func() tea.Msg {
 		secret, err := client.Read(path)
-		return secretResultMsg{path: path, secret: secret, err: err}
+		return secretResultMsg{mount: client.Mount(), path: path, secret: secret, err: err}
 	}
 }
 
@@ -220,13 +220,16 @@ func (m *Model) readSecret(path string) tea.Cmd {
 		if err != nil {
 			return errorMsg(err.Error())
 		}
-		return secretResultMsg{path: path, secret: secret, openPopup: true}
+		return secretResultMsg{mount: client.Mount(), path: path, secret: secret, openPopup: true}
 	}
 }
 
 // --- Result handlers ---
 
 func (m *Model) handleListResult(msg listResultMsg) (tea.Model, tea.Cmd) {
+	if msg.mount != m.client.Mount() {
+		return m, nil
+	}
 	if msg.path == "@@mount_preview@@" {
 		// Preview result for mount selection
 		if msg.err != nil {
@@ -293,6 +296,10 @@ func (m *Model) handleListResult(msg listResultMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleSecretResult(msg secretResultMsg) (tea.Model, tea.Cmd) {
+	// The user switched mount after the read. An editor save would land on the new mount.
+	if msg.mount != m.client.Mount() {
+		return m, nil
+	}
 	if msg.err != nil {
 		m.errMsg = msg.err.Error()
 		return m, nil

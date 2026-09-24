@@ -14,7 +14,7 @@ func (m *Model) loadVersionHistory(path string) tea.Cmd {
 	client := m.client
 	return func() tea.Msg {
 		versions, err := client.ReadVersionMetadata(path)
-		return versionHistoryMsg{path: path, versions: versions, err: err}
+		return versionHistoryMsg{mount: client.Mount(), path: path, versions: versions, err: err}
 	}
 }
 
@@ -40,7 +40,7 @@ func (m *Model) handleVersionHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			client := m.client
 			return m, func() tea.Msg {
 				secret, err := client.ReadVersion(path, ver)
-				return versionDetailMsg{version: ver, secret: secret, err: err}
+				return versionDetailMsg{mount: client.Mount(), version: ver, secret: secret, err: err}
 			}
 		}
 	case "D":
@@ -90,7 +90,7 @@ func (m *Model) destroyVersion(path string, version int) tea.Cmd {
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Destroyed version %d (reload failed: %v)", version, err))
 		}
-		return versionHistoryMsg{path: path, versions: versions}
+		return versionHistoryMsg{mount: client.Mount(), path: path, versions: versions}
 	}
 }
 
@@ -106,7 +106,7 @@ func (m *Model) destroyOldVersions(path string) tea.Cmd {
 		if err != nil {
 			return statusMsg(fmt.Sprintf("Destroyed %d old versions (reload failed: %v)", count, err))
 		}
-		return versionHistoryMsg{path: path, versions: versions}
+		return versionHistoryMsg{mount: client.Mount(), path: path, versions: versions}
 	}
 }
 

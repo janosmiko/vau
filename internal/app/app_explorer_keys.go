@@ -366,7 +366,7 @@ func (m *Model) handleExplorerModeKey(key string) (tea.Model, tea.Cmd, bool) {
 				if err != nil {
 					return errorMsg(err.Error())
 				}
-				return secretResultMsg{path: path, secret: secret, openEditor: true}
+				return secretResultMsg{mount: client.Mount(), path: path, secret: secret, openEditor: true}
 			}, true
 		}
 		return m, nil, true

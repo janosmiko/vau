@@ -205,6 +205,9 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case versionHistoryMsg:
+		if msg.mount != m.client.Mount() {
+			return m, nil, true
+		}
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			return m, nil, true
@@ -215,6 +218,9 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case versionDetailMsg:
+		if msg.mount != m.client.Mount() {
+			return m, nil, true
+		}
 		if msg.err != nil {
 			m.errMsg = msg.err.Error()
 			return m, nil, true

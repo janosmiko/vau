@@ -1051,7 +1051,7 @@ func TestUpdate_VersionHistoryMsg_Success(t *testing.T) {
 		{Version: "2", CreatedTime: "2024-01-02"},
 	}
 
-	result, cmd := m.Update(versionHistoryMsg{versions: versions})
+	result, cmd := m.Update(versionHistoryMsg{mount: "secret", versions: versions})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeVersionHistory, resultModel.mode)
@@ -1062,7 +1062,7 @@ func TestUpdate_VersionHistoryMsg_Success(t *testing.T) {
 
 func TestUpdate_VersionHistoryMsg_Error(t *testing.T) {
 	m := newTestModel()
-	result, cmd := m.Update(versionHistoryMsg{err: assert.AnError})
+	result, cmd := m.Update(versionHistoryMsg{mount: "secret", err: assert.AnError})
 	resultModel := result.(*Model)
 
 	assert.Contains(t, resultModel.errMsg, "assert.AnError")
@@ -1077,7 +1077,7 @@ func TestUpdate_VersionDetailMsg_Success(t *testing.T) {
 		Data: map[string]string{"key1": "val1"},
 	}
 
-	result, cmd := m.Update(versionDetailMsg{version: 2, secret: secret})
+	result, cmd := m.Update(versionDetailMsg{mount: "secret", version: 2, secret: secret})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeSecret, resultModel.mode)
@@ -1092,7 +1092,7 @@ func TestUpdate_VersionDetailMsg_Success(t *testing.T) {
 
 func TestUpdate_VersionDetailMsg_Error(t *testing.T) {
 	m := newTestModel()
-	result, _ := m.Update(versionDetailMsg{err: assert.AnError})
+	result, _ := m.Update(versionDetailMsg{mount: "secret", err: assert.AnError})
 	assert.Contains(t, result.(*Model).errMsg, "assert.AnError")
 }
 
@@ -1193,6 +1193,7 @@ func TestHandleListResult_MountPreview(t *testing.T) {
 
 	entries := []model.Entry{{Name: "subdir/", IsDir: true}}
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "@@mount_preview@@",
 		entries: entries,
 	})
@@ -1208,8 +1209,9 @@ func TestHandleListResult_MountPreview_Error(t *testing.T) {
 	m.previewEntries = []model.Entry{{Name: "old/"}}
 
 	result, cmd := m.handleListResult(listResultMsg{
-		path: "@@mount_preview@@",
-		err:  assert.AnError,
+		mount: "secret",
+		path:  "@@mount_preview@@",
+		err:   assert.AnError,
 	})
 	resultModel := result.(*Model)
 
@@ -1221,8 +1223,9 @@ func TestHandleListResult_MountPreview_Error(t *testing.T) {
 func TestHandleListResult_Error(t *testing.T) {
 	m := newTestModel()
 	result, cmd := m.handleListResult(listResultMsg{
-		path: "some/path/",
-		err:  assert.AnError,
+		mount: "secret",
+		path:  "some/path/",
+		err:   assert.AnError,
 	})
 	resultModel := result.(*Model)
 
@@ -1239,6 +1242,7 @@ func TestHandleListResult_PreviewResult(t *testing.T) {
 
 	entries := []model.Entry{{Name: "preview-item", IsDir: false}}
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/sub/",
 		entries: entries,
 	})
@@ -1259,6 +1263,7 @@ func TestHandleListResult_ParentResult(t *testing.T) {
 		{Name: "data/", IsDir: true},
 	}
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "secret/",
 		entries: parentEntries,
 	})
@@ -1276,7 +1281,7 @@ func TestHandleListResult_ParentResult(t *testing.T) {
 
 func TestHandleSecretResult_Error(t *testing.T) {
 	m := newTestModel()
-	result, cmd := m.handleSecretResult(secretResultMsg{err: assert.AnError})
+	result, cmd := m.handleSecretResult(secretResultMsg{mount: "secret", err: assert.AnError})
 	resultModel := result.(*Model)
 
 	assert.Contains(t, resultModel.errMsg, "assert.AnError")
@@ -1292,6 +1297,7 @@ func TestHandleSecretResult_OpenPopup(t *testing.T) {
 	}
 
 	result, cmd := m.handleSecretResult(secretResultMsg{
+		mount:     "secret",
 		secret:    secret,
 		openPopup: true,
 	})
@@ -1320,6 +1326,7 @@ func TestHandleSecretResult_Preview(t *testing.T) {
 	}
 
 	result, _ := m.handleSecretResult(secretResultMsg{
+		mount:     "secret",
 		path:      "preview",
 		secret:    secret,
 		openPopup: false,
@@ -1752,7 +1759,7 @@ func TestHandleSecretResult_Preview_ClearsPreviewEntries(t *testing.T) {
 		Data: map[string]string{"k": "v"},
 	}
 
-	result, _ := m.handleSecretResult(secretResultMsg{path: "preview", secret: secret, openPopup: false})
+	result, _ := m.handleSecretResult(secretResultMsg{mount: "secret", path: "preview", secret: secret, openPopup: false})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, secret, resultModel.previewSecret)
@@ -1774,6 +1781,7 @@ func TestHandleListResult_CurrentPath(t *testing.T) {
 		{Name: "beta/", IsDir: true},
 	}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -1789,6 +1797,7 @@ func TestHandleListResult_CurrentPath_CursorBeyondRange(t *testing.T) {
 
 	newEntries := []model.Entry{{Name: "only-one", IsDir: false}}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -1807,6 +1816,7 @@ func TestHandleListResult_CurrentPath_WithFilter(t *testing.T) {
 		{Name: "beta", IsDir: false},
 	}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -2161,6 +2171,7 @@ func TestHandleListResult_EmptyDir_NavigatesUp(t *testing.T) {
 	m.path = []string{"dir/", "subdir/"}
 
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/subdir/",
 		entries: []model.Entry{}, // empty dir
 	})

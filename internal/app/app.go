@@ -12,11 +12,13 @@ import (
 // Messages
 type (
 	listResultMsg struct {
+		mount   string
 		path    string
 		entries []model.Entry
 		err     error
 	}
 	secretResultMsg struct {
+		mount      string
 		path       string
 		secret     *model.Secret
 		err        error
@@ -41,11 +43,13 @@ type (
 		reloadSecret *model.Secret // optional: updated secret to apply to m.secret
 	}
 	versionHistoryMsg struct {
+		mount    string
 		path     string
 		versions []model.SecretVersion
 		err      error
 	}
 	versionDetailMsg struct {
+		mount   string
 		version int
 		secret  *model.Secret
 		err     error
