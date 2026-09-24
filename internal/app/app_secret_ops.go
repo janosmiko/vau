@@ -550,6 +550,32 @@ func (m *Model) editValue(key, val string) tea.Cmd {
 	}
 }
 
+// editValueWithSnapshot is like editValue, but takes snapData/snapKeys from
+// the caller: applyCurrentEditInput already mutated m.secret by this point.
+func (m *Model) editValueWithSnapshot(key, val string, snapData map[string]string, snapKeys []string) tea.Cmd {
+	secretPath := m.secret.Path
+
+	m.secret.Data[key] = val
+
+	writeData := copyMap(m.secret.Data)
+
+	return func() tea.Msg {
+		if err := m.client.Write(secretPath, writeData); err != nil {
+			return errorMsg(err.Error())
+		}
+		return undoableStatusMsg{
+			status: "Updated: " + key,
+			undo: model.UndoAction{
+				Type:        model.UndoEditSecret,
+				Description: "edit " + key,
+				Path:        secretPath,
+				Data:        snapData,
+				Keys:        snapKeys,
+			},
+		}
+	}
+}
+
 // editSecretInEditor opens the secret data in an external editor as pretty-printed JSON.
 func (m *Model) editSecretInEditor() tea.Cmd {
 	data, err := json.MarshalIndent(m.secret.Data, "", "  ")

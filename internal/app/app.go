@@ -144,20 +144,22 @@ type Model struct {
 	previewMode    model.PreviewMode
 
 	// Secret view state
-	mode              model.ViewMode
-	secret            *model.Secret
-	secretCursor      int
-	revealed          map[string]bool
-	secretBase64      map[string]bool // tracks base64 decode toggle per key
-	secretAllRevealed bool
-	secretJSONView    bool
-	dockerFields      []model.DockerConfigField
-	dockerCursor      int
-	dockerRevealed    bool
-	dockerTitle       string
-	secretEditKey     string // key being inline-edited
-	secretEditColumn  int    // 0=key, 1=value column being edited
-	secretEditOrigKey string // original key name before key-column edit (for rename)
+	mode               model.ViewMode
+	secret             *model.Secret
+	secretCursor       int
+	revealed           map[string]bool
+	secretBase64       map[string]bool // tracks base64 decode toggle per key
+	secretAllRevealed  bool
+	secretJSONView     bool
+	dockerFields       []model.DockerConfigField
+	dockerCursor       int
+	dockerRevealed     bool
+	dockerTitle        string
+	secretEditKey      string            // key being inline-edited
+	secretEditColumn   int               // 0=key, 1=value column being edited
+	secretEditOrigKey  string            // original key name before key-column edit (for rename)
+	secretEditSnapData map[string]string // secret.Data snapshot taken when inline editing started
+	secretEditSnapKeys []string          // secret.Keys snapshot taken when inline editing started
 
 	// Bulk selection
 	selected map[int]bool // selected entry indices (in unfiltered entries list)

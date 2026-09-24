@@ -156,6 +156,8 @@ func (m *Model) handleSecretEditActionKey(key string) (tea.Model, tea.Cmd, bool)
 				m.secretEditKey = key
 				m.secretEditOrigKey = key
 				m.secretEditColumn = 1 // edit value column
+				m.secretEditSnapData = copyMap(m.secret.Data)
+				m.secretEditSnapKeys = copySlice(m.secret.Keys)
 				m.mode = model.ModeSecretEdit
 				m.textInput.SetValue(m.secret.Data[key])
 				m.textInput.Focus()
@@ -168,6 +170,8 @@ func (m *Model) handleSecretEditActionKey(key string) (tea.Model, tea.Cmd, bool)
 	case "a":
 		// Inline add: append empty row and start editing the key column
 		if m.secret != nil {
+			m.secretEditSnapData = copyMap(m.secret.Data)
+			m.secretEditSnapKeys = copySlice(m.secret.Keys)
 			m.secret.Keys = append(m.secret.Keys, "")
 			m.secret.Data[""] = ""
 			m.secretCursor = len(m.secret.Keys) - 1
@@ -281,12 +285,18 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		// Cancel: revert any uncommitted changes
 		m.textInput.Blur()
-		// If we were adding a new key (origKey is empty) and haven't saved yet,
-		// remove the placeholder empty-key row
-		if m.secretEditOrigKey == "" && m.secretEditKey == "" {
-			// Remove the empty placeholder row we added
+		if m.secretEditSnapData != nil {
+			// Restore the state captured when editing started, undoing any
+			// tab-committed rename/value that never reached Vault.
+			m.secret.Data = m.secretEditSnapData
+			m.secret.Keys = m.secretEditSnapKeys
+			if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
+				m.secretCursor = len(m.secret.Keys) - 1
+			}
+		} else if m.secretEditOrigKey == "" && m.secretEditKey == "" {
+			// No snapshot (e.g. editing a freshly created secret) — fall back
+			// to removing the placeholder empty-key row.
 			delete(m.secret.Data, "")
-			// Just remove last empty key (the one we added)
 			m.secret.Keys = m.removeLastEmptyKey()
 			if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
 				m.secretCursor = len(m.secret.Keys) - 1
@@ -296,6 +306,8 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.secretEditKey = ""
 		m.secretEditOrigKey = ""
 		m.secretEditColumn = 0
+		m.secretEditSnapData = nil
+		m.secretEditSnapKeys = nil
 		return m, nil
 
 	case "tab":
@@ -314,11 +326,14 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		origKey := m.secretEditOrigKey
 		currentKey := m.secretEditKey
 		val := m.secret.Data[currentKey]
+		snapData, snapKeys := m.secretEditSnapData, m.secretEditSnapKeys
 
 		m.mode = model.ModeSecret
 		m.secretEditKey = ""
 		m.secretEditOrigKey = ""
 		m.secretEditColumn = 0
+		m.secretEditSnapData = nil
+		m.secretEditSnapKeys = nil
 
 		if origKey == "" && currentKey == "" {
 			// New key was added but name left empty — remove it
@@ -349,11 +364,11 @@ func (m *Model) handleSecretEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		if origKey != currentKey {
 			// Key was renamed — need to rename and possibly update value
-			return m, m.renameKey(origKey, currentKey, val)
+			return m, m.renameKey(origKey, currentKey, val, snapData, snapKeys)
 		}
 
 		// Only value changed
-		return m, m.editValue(currentKey, val)
+		return m, m.editValueWithSnapshot(currentKey, val, snapData, snapKeys)
 	}
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
@@ -419,10 +434,10 @@ func (m *Model) removeLastEmptyKey() []string {
 	return m.secret.Keys
 }
 
-// renameKey handles renaming a key in the secret (delete old, add new with value).
-func (m *Model) renameKey(oldKey, newKey, val string) tea.Cmd {
-	snapData := copyMap(m.secret.Data)
-	snapKeys := copySlice(m.secret.Keys)
+// renameKey handles renaming a key in the secret (delete old, add new with
+// value). snapData/snapKeys must be the secret's Data/Keys as they were
+// before the inline edit started, so undo restores the pre-edit state.
+func (m *Model) renameKey(oldKey, newKey, val string, snapData map[string]string, snapKeys []string) tea.Cmd {
 	secretPath := m.secret.Path
 
 	// Mutate model state synchronously (safe — called from Update goroutine).
