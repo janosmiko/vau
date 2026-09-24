@@ -15,8 +15,9 @@ import (
 
 func (m *Model) yankSecret(path string) tea.Cmd {
 	isCut := m.yankIsCut
+	client := m.client
 	return func() tea.Msg {
-		secret, err := m.client.Read(path)
+		secret, err := client.Read(path)
 		if err != nil {
 			return errorMsg(fmt.Sprintf("yank failed: %v", err))
 		}
@@ -26,6 +27,7 @@ func (m *Model) yankSecret(path string) tea.Cmd {
 
 func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
 	basePath := m.currentPath()
+	client := m.client
 	return func() tea.Msg {
 		var secrets []*model.Secret
 		var paths []string
@@ -37,7 +39,7 @@ func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
 				hasDir = true
 				continue
 			}
-			secret, err := m.client.Read(basePath + entry.Name)
+			secret, err := client.Read(basePath + entry.Name)
 			if err != nil {
 				return errorMsg(fmt.Sprintf("yank failed for %s: %v", entry.Name, err))
 			}
@@ -98,8 +100,8 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 
 	return func() tea.Msg {
 		// Read secret data before deleting (for undo)
-		secret, _ := m.client.Read(path)
-		if err := m.client.Delete(path); err != nil {
+		secret, _ := client.Read(path)
+		if err := client.Delete(path); err != nil {
 			return errorMsg(err.Error())
 		}
 		var data map[string]string
@@ -124,6 +126,7 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 func (m *Model) renameEntry(newName string) tea.Cmd {
 	entry := m.selectedEntry()
 	base := m.currentPath()
+	client := m.client
 	return func() tea.Msg {
 		if entry == nil {
 			return errorMsg("no entry selected")
@@ -131,7 +134,7 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 		if entry.IsDir {
 			src := base + strings.TrimSuffix(entry.Name, "/")
 			dst := base + strings.TrimSuffix(newName, "/")
-			count, err := m.client.MoveRecursive(src, dst)
+			count, err := client.MoveRecursive(src, dst)
 			if err != nil {
 				return errorMsg(err.Error())
 			}
@@ -147,7 +150,7 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 		}
 		src := base + entry.Name
 		dst := base + newName
-		if err := m.client.Move(src, dst); err != nil {
+		if err := client.Move(src, dst); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -163,22 +166,25 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 }
 
 func (m *Model) createSecretWithCheck(path string) tea.Cmd {
+	client := m.client
+	create := m.createEmptySecretAndOpen(path)
 	return func() tea.Msg {
 		// Check if secret already exists
-		if _, err := m.client.Read(path); err == nil {
+		if _, err := client.Read(path); err == nil {
 			return confirmCreateMsg(path)
 		}
 		// Create an empty secret and open the popup for inline editing
-		return m.createEmptySecretAndOpen(path)()
+		return create()
 	}
 }
 
 // createEmptySecretAndOpen writes an empty secret to Vault and returns a
 // secretResultMsg that opens the popup with inline editing ready.
 func (m *Model) createEmptySecretAndOpen(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
 		emptyData := map[string]string{}
-		if err := m.client.Write(path, emptyData); err != nil {
+		if err := client.Write(path, emptyData); err != nil {
 			return errorMsg(fmt.Sprintf("Failed to create secret: %v", err))
 		}
 		secret := &model.Secret{
@@ -193,8 +199,9 @@ func (m *Model) createEmptySecretAndOpen(path string) tea.Cmd {
 // createSecretWithEditor checks if a secret exists, and either prompts for
 // overwrite or directly opens the external editor for a new secret.
 func (m *Model) createSecretWithEditor(path string) tea.Cmd {
+	client := m.client
 	return func() tea.Msg {
-		if _, err := m.client.Read(path); err == nil {
+		if _, err := client.Read(path); err == nil {
 			return confirmCreateEditorMsg(path)
 		}
 		return newSecretEditorMsg(path)
@@ -316,10 +323,10 @@ func (m *Model) pasteSecrets() tea.Cmd {
 			dst := basePath + name
 
 			// If destination exists, append _1, _2, etc.
-			if _, err := m.client.Read(dst); err == nil {
+			if _, err := client.Read(dst); err == nil {
 				for i := 1; ; i++ {
 					candidate := basePath + fmt.Sprintf("%s_%d", name, i)
-					if _, err := m.client.Read(candidate); err != nil {
+					if _, err := client.Read(candidate); err != nil {
 						dst = candidate
 						break
 					}
@@ -327,12 +334,12 @@ func (m *Model) pasteSecrets() tea.Cmd {
 			}
 
 			// Use CopyWithHistory to preserve version history.
-			if err := m.client.CopyWithHistory(yanked.Path, dst); err != nil {
+			if err := client.CopyWithHistory(yanked.Path, dst); err != nil {
 				return errorMsg(fmt.Sprintf("pasted %d items, then error: %v", pastedCount, err))
 			}
 
 			if isCut {
-				if err := m.client.Delete(yanked.Path); err != nil {
+				if err := client.Delete(yanked.Path); err != nil {
 					return errorMsg(fmt.Sprintf("pasted to %s but failed to delete source: %v", dst, err))
 				}
 			}
@@ -397,9 +404,10 @@ func (m *Model) deleteKey(key string) tea.Cmd {
 
 	// Copy updated state for the async Vault write.
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -500,9 +508,10 @@ func (m *Model) addKeyValue(key, val string) tea.Cmd {
 
 	// Copy updated state for the async Vault write.
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -528,9 +537,10 @@ func (m *Model) editValue(key, val string) tea.Cmd {
 
 	// Copy updated state for the async Vault write.
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -554,9 +564,10 @@ func (m *Model) editValueWithSnapshot(key, val string, snapData map[string]strin
 	m.secret.Data[key] = val
 
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
@@ -625,9 +636,10 @@ func (m *Model) editSecretInEditor() tea.Cmd {
 func (m *Model) saveSecretFromEditor(secretPath string, snapData map[string]string, snapKeys []string) tea.Cmd {
 	// Copy updated state for the async Vault write (avoid reading m.secret in goroutine).
 	writeData := copyMap(m.secret.Data)
+	client := m.client
 
 	return func() tea.Msg {
-		if err := m.client.Write(secretPath, writeData); err != nil {
+		if err := client.Write(secretPath, writeData); err != nil {
 			return errorMsg(err.Error())
 		}
 		return undoableStatusMsg{
