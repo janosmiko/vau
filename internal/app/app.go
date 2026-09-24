@@ -157,6 +157,10 @@ type Model struct {
 	secretBase64      map[string]bool // tracks base64 decode toggle per key
 	secretAllRevealed bool
 	secretJSONView    bool
+	dockerFields      []model.DockerConfigField
+	dockerCursor      int
+	dockerRevealed    bool
+	dockerTitle       string
 	secretEditKey     string // key being inline-edited
 	secretEditColumn  int    // 0=key, 1=value column being edited
 	secretEditOrigKey string // original key name before key-column edit (for rename)
@@ -868,6 +872,9 @@ func (m *Model) View() string {
 	case model.ModeVersionHistory:
 		overlay := ui.RenderVersionHistoryOverlay(m.versionHistory, m.versionCursor, m.versionPath, m.width, m.height)
 		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
+	case model.ModeDockerConfig:
+		overlay := ui.RenderDockerConfigOverlay(m.dockerTitle, m.dockerFields, m.dockerCursor, m.dockerRevealed, m.width, m.height)
+		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
 	case model.ModeHelp:
 		overlay := ui.RenderHelpScreen(m.width, m.height, m.helpScroll, m.helpFilter, m.helpSearching, &m.searchInput)
 		base = ui.PlaceOverlay(base, overlay, m.width, m.height)
@@ -969,7 +976,7 @@ func (m *Model) backgroundMode() model.ViewMode {
 		return m.prevConfirmMode
 	case model.ModeInput:
 		return m.prevInputMode
-	case model.ModeSecret, model.ModeSecretEdit, model.ModeVersionHistory, model.ModeSearch, model.ModeFilter, model.ModeHelp, model.ModeJumpPath, model.ModeBookmark, model.ModeThemePicker:
+	case model.ModeSecret, model.ModeSecretEdit, model.ModeVersionHistory, model.ModeDockerConfig, model.ModeSearch, model.ModeFilter, model.ModeHelp, model.ModeJumpPath, model.ModeBookmark, model.ModeThemePicker:
 		return model.ModeExplorer
 	case model.ModePolicyView:
 		return model.ModePolicyList
@@ -1129,6 +1136,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Version history mode
 	if m.mode == model.ModeVersionHistory {
 		return m.handleVersionHistoryKey(msg)
+	}
+
+	if m.mode == model.ModeDockerConfig {
+		return m.handleDockerConfigKey(msg)
 	}
 
 	// Help screen
@@ -2476,6 +2487,21 @@ func (m *Model) handleSecretKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				m.secretBase64[key] = true
 			}
+		}
+
+	case "d":
+		if m.secret != nil && len(m.secret.Keys) > 0 {
+			key := m.secret.Keys[m.secretCursor]
+			fields, ok := parseDockerConfig(m.secret.Data[key])
+			if !ok {
+				m.errMsg = "Not a dockerconfigjson value"
+				break
+			}
+			m.dockerFields = fields
+			m.dockerCursor = 0
+			m.dockerRevealed = false
+			m.dockerTitle = m.secret.Path + "/" + key
+			m.mode = model.ModeDockerConfig
 		}
 
 	case "H":

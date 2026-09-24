@@ -203,6 +203,7 @@ Opened by pressing `Enter` on a secret (or `e` in explorer). Appears as a center
 | `v` / `Tab` | Toggle value visibility (hidden by default) |
 | `V` | Toggle JSON view |
 | `b` | Toggle base64 decode for selected value |
+| `d` | View registry credentials of a dockerconfigjson value |
 | `y` | Copy selected value (or entire secret as JSON in JSON view) |
 | `Y` + `j`/`y`/`d` | Copy entire secret as JSON / YAML / dotenv |
 | `p` | Paste system clipboard as selected value |
@@ -225,6 +226,17 @@ Opened by pressing `Enter` on a secret (or `e` in explorer). Appears as a center
 | `D` | Destroy selected version (permanent, with confirmation) |
 | `Ctrl+X` | Destroy all old versions, keep latest (with confirmation) |
 | `Esc` | Close version history |
+
+### Docker Config
+
+Opened by pressing `d` on a dockerconfigjson value (raw or base64-encoded JSON) in the secret popup.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate fields |
+| `v` / `Tab` | Toggle password / auth visibility |
+| `y` | Copy selected field |
+| `Esc` / `q` / `h` | Back to secret popup |
 
 ### Inline Edit (Secret Popup)
 
