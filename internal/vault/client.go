@@ -619,7 +619,10 @@ func (c *Client) MoveRecursive(src, dst string) (int, error) {
 }
 
 // CountRecursive counts the total number of secrets under a path (including the path itself if it's a secret).
-func (c *Client) CountRecursive(path string) (int, error) {
+func (c *Client) CountRecursive(ctx context.Context, path string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	entries, err := c.List(path)
 	if entries == nil || err != nil {
 		// Not a directory or List failed — treat as a single secret.
@@ -635,7 +638,7 @@ func (c *Client) CountRecursive(path string) (int, error) {
 	for _, e := range entries {
 		childPath := dirPath + e.Name
 		if e.IsDir {
-			n, err := c.CountRecursive(strings.TrimSuffix(childPath, "/"))
+			n, err := c.CountRecursive(ctx, strings.TrimSuffix(childPath, "/"))
 			if err != nil {
 				return count, err
 			}

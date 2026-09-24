@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -68,4 +69,14 @@ func TestClient_ConcurrentMountVersionCache(t *testing.T) {
 		})
 	}
 	wg.Wait()
+}
+
+func TestCountRecursive_StopsWhenCancelled(t *testing.T) {
+	c := newKV1Server(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := c.CountRecursive(ctx, "dir")
+
+	assert.ErrorIs(t, err, context.Canceled)
 }

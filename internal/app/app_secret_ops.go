@@ -78,7 +78,7 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 			if err := ctx.Err(); err != nil {
 				return progressDoneMsg{operation: operation, err: err}
 			}
-			total, _ := client.CountRecursive(path)
+			total, _ := client.CountRecursive(ctx, path)
 			if reporter != nil {
 				reporter.report(0, total)
 			}
@@ -217,10 +217,10 @@ func (m *Model) createSecretWithEditor(path string) tea.Cmd {
 
 // countYankTotal counts the items under yankPaths (best-effort) for progress
 // display, doubling for a cut since it involves a copy phase and a delete phase.
-func countYankTotal(client *vault.Client, yankPaths []string, isCut bool) int {
+func countYankTotal(ctx context.Context, client *vault.Client, yankPaths []string, isCut bool) int {
 	total := 0
 	for _, yp := range yankPaths {
-		if n, err := client.CountRecursive(yp); err == nil {
+		if n, err := client.CountRecursive(ctx, yp); err == nil {
 			total += n
 		}
 	}
@@ -266,7 +266,7 @@ func (m *Model) pasteSecrets() tea.Cmd {
 				return progressDoneMsg{operation: operation, err: err}
 			}
 
-			total := countYankTotal(client, yankPaths, isCut)
+			total := countYankTotal(ctx, client, yankPaths, isCut)
 			if reporter != nil {
 				reporter.report(0, total)
 			}
@@ -734,7 +734,7 @@ func (m *Model) bulkDelete(entries []model.Entry) tea.Cmd {
 		for _, entry := range entries {
 			if entry.IsDir {
 				path := basePath + strings.TrimSuffix(entry.Name, "/")
-				n, _ := client.CountRecursive(path)
+				n, _ := client.CountRecursive(ctx, path)
 				total += n
 			} else {
 				total++
