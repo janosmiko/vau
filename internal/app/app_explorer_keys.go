@@ -290,6 +290,7 @@ func (m *Model) handleExplorerClipboardKey(key string) (tea.Model, tea.Cmd, bool
 			m.yankIsCut = true
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
+			m.yankedSecrets = nil
 			m.status = "Cutting " + entry.Name + "..."
 			return m, m.yankSecret(path), true
 		}
@@ -451,6 +452,7 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 			m.yankIsCut = false
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
+			m.yankedSecrets = nil
 			m.status = "Yanking " + entry.Name + "..."
 			return m, m.yankSecret(path), true
 		}

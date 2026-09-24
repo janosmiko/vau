@@ -132,6 +132,33 @@ func TestPendingYankOnNewMountDoesNotUnlockPaste(t *testing.T) {
 	assert.Equal(t, "Cannot paste across different mounts", m.errMsg)
 }
 
+func TestPendingCutNeverDeletesPreviouslyYankedSecret(t *testing.T) {
+	c, fv := newFakeVault(t)
+	fv.put("dir/old", map[string]string{"k": "1"})
+	fv.put("dir/new", map[string]string{"k": "2"})
+
+	m := newTestModel()
+	m.client = c
+	m.mode = model.ModeExplorer
+	m.path = []string{"dir/"}
+	m.entries = []model.Entry{{Name: "old"}, {Name: "new"}}
+
+	_, yank := m.handleExplorerKey(keyMsg("y"))
+	_, _ = m.Update(yank())
+
+	m.cursor = 1
+	_, pending := m.handleExplorerKey(keyMsg("x"))
+	require.NotNil(t, pending)
+
+	m.path = []string{"other/"}
+	_, paste := m.handleExplorerKey(keyMsg("p"))
+	if paste != nil {
+		_ = paste()
+	}
+	_, exists := fv.get("dir/old")
+	assert.True(t, exists, "a copy-yanked secret must never be deleted by a pending cut")
+}
+
 func TestNewSecretResultsFromPreviousMountAreDropped(t *testing.T) {
 	m := newTestModel()
 	m.mode = model.ModeExplorer
