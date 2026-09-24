@@ -110,8 +110,9 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// deleteSelectedBookmark removes the bookmark under the cursor by slot,
-// persisting the change before applying it to m.bookmarks.
+// deleteSelectedBookmark removes the bookmark under the cursor, persisting the
+// change before applying it to m.bookmarks. Config bookmarks can have no slot,
+// so it matches the whole bookmark.
 func (m *Model) deleteSelectedBookmark(filtered []config.Bookmark) {
 	if len(filtered) == 0 || m.bookmarkCursor >= len(filtered) {
 		return
@@ -119,7 +120,7 @@ func (m *Model) deleteSelectedBookmark(filtered []config.Bookmark) {
 	bm := filtered[m.bookmarkCursor]
 	idx := -1
 	for i, b := range m.bookmarks {
-		if b.Slot == bm.Slot {
+		if b == bm {
 			idx = i
 			break
 		}

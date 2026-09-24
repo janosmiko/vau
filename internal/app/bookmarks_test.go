@@ -132,3 +132,21 @@ func TestHandleMarkSave_RejectsUnreachableSlots(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleBookmarkOverlayKey_Delete_SlotlessDeletesSelected(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	m := &Model{
+		mode: model.ModeBookmark,
+		bookmarks: []config.Bookmark{
+			{Name: "first", Mount: "kv", Path: "a"},
+			{Name: "second", Mount: "kv", Path: "b"},
+		},
+		bookmarkCursor: 1,
+	}
+
+	m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+
+	require.Len(t, m.bookmarks, 1)
+	assert.Equal(t, "first", m.bookmarks[0].Name)
+}
