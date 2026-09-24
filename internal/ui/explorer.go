@@ -334,7 +334,7 @@ func renderSecretPreview(secret *model.Secret, previewMode model.PreviewMode, wi
 }
 
 func renderSecretJSON(secret *model.Secret, height int) string {
-	limit := min(height-2, len(secret.Keys))
+	limit := max(min(height-2, len(secret.Keys)), 0)
 	lines := make([]string, 0, 1+limit+1)
 	lines = append(lines, HelpDescStyle.Render("{"))
 	for i := range limit {

@@ -444,6 +444,33 @@ func TestRenderExplorerWithTabs(t *testing.T) {
 	assert.Contains(t, result, "2 kv/staging")
 }
 
+func TestRenderExplorer_TinyHeightDoesNotPanic(t *testing.T) {
+	secret := &model.Secret{
+		Keys: []string{"a", "b"},
+		Data: map[string]string{"a": "1", "b": "2"},
+	}
+	modes := []model.PreviewMode{model.PreviewHidden, model.PreviewValues, model.PreviewJSON}
+	for _, mode := range modes {
+		for height := 1; height <= 6; height++ {
+			assert.NotPanics(t, func() {
+				RenderExplorer(
+					nil,
+					[]model.Entry{{Name: "mysecret", IsDir: false}},
+					nil,
+					secret, mode,
+					0, 0, nil,
+					nil,
+					"secret",
+					[]string{"a", "b"}, 0,
+					"",
+					"v0.3.0",
+					100, height,
+				)
+			}, "mode=%d height=%d", mode, height)
+		}
+	}
+}
+
 func TestRenderExplorerWithSecretPreview(t *testing.T) {
 	secret := &model.Secret{
 		Keys: []string{"key1"},
