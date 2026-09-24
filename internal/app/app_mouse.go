@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/vau/internal/model"
@@ -70,7 +71,7 @@ func (m *Model) handleExplorerMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.Button == tea.MouseButtonWheelDown {
 		if m.atMountLevel {
-			if m.mountCursor < len(m.mounts)-1 {
+			if m.mountCursor < len(m.mountEntries())-1 {
 				m.mountCursor++
 				return m, m.loadMountPreview()
 			}
@@ -247,16 +248,21 @@ func (m *Model) handleMountLevelClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	allEntries := m.mountEntries()
 	if msg.X < midEnd {
-		// Click on a mount in the mid column: select it
-		if entryRow >= 0 && entryRow < len(m.mounts) {
+		// Click on a mount or access category in the mid column: select it
+		if entryRow >= 0 && entryRow < len(allEntries) {
 			m.mountCursor = entryRow
 			return m, m.loadMountPreview()
 		}
 	} else {
-		// Click on right column: enter selected mount
-		if len(m.mounts) > 0 && m.mountCursor < len(m.mounts) {
-			m.client.SetMount(m.mounts[m.mountCursor])
+		// Click on right column: enter the selected mount or access category
+		if m.mountCursor < len(allEntries) {
+			selected := allEntries[m.mountCursor]
+			if isAccessCategory(selected.Name) {
+				return m.enterAccessCategory(selected.Name)
+			}
+			m.client.SetMount(strings.TrimSuffix(selected.Name, "/"))
 			m.atMountLevel = false
 			m.path = nil
 			m.cursor = 0
