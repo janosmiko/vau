@@ -2,7 +2,9 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -97,6 +99,12 @@ func (c *Client) getMountVersion(mount string) int {
 	}
 	v = 2
 	secret, err := c.raw.Logical().Read("sys/mounts/" + mount)
+	var respErr *vaultapi.ResponseError
+	if err != nil && (!errors.As(err, &respErr) || respErr.StatusCode != http.StatusForbidden) {
+		// Cache a 403, because it does not go away. Any other error can be transient,
+		// and a cached v2 fallback would send all later KV v1 calls to v2 paths.
+		return v
+	}
 	if err == nil && secret != nil {
 		if options, ok := secret.Data["options"].(map[string]any); ok {
 			if version, ok := options["version"].(string); ok && version == "1" {
@@ -181,13 +189,18 @@ func (c *Client) ListWithMount(mount, path string) ([]model.Entry, error) {
 
 // List returns entries at the given path within the KV engine.
 func (c *Client) List(path string) ([]model.Entry, error) {
+	return c.ListCtx(context.Background(), path)
+}
+
+// ListCtx is List with a context that can cancel the request.
+func (c *Client) ListCtx(ctx context.Context, path string) ([]model.Entry, error) {
 	var apiPath string
 	if c.getMountVersion(c.mount) == 1 {
 		apiPath = fmt.Sprintf("%s/%s", c.mount, path)
 	} else {
 		apiPath = fmt.Sprintf("%s/metadata/%s", c.mount, path)
 	}
-	secret, err := c.raw.Logical().List(apiPath)
+	secret, err := c.raw.Logical().ListWithContext(ctx, apiPath)
 	if err != nil {
 		return nil, fmt.Errorf("listing %s: %w", path, err)
 	}
@@ -623,7 +636,10 @@ func (c *Client) CountRecursive(ctx context.Context, path string) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	entries, err := c.List(path)
+	entries, err := c.ListCtx(ctx, path)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return 0, ctxErr
+	}
 	if entries == nil || err != nil {
 		// Not a directory or List failed — treat as a single secret.
 		return 1, nil //nolint:nilerr // List error means it's a single secret, not a real error
