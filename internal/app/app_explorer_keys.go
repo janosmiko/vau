@@ -353,8 +353,7 @@ func (m *Model) handleExplorerModeKey(key string) (tea.Model, tea.Cmd, bool) {
 		m.jumpCompletions = nil
 		m.jumpCompIdx = -1
 		m.jumpLastInput = ""
-		m.loadJumpCompletions()
-		return m, textinput.Blink, true
+		return m, tea.Batch(textinput.Blink, m.loadJumpCompletions()), true
 
 	case matchKey(key, m.keys.Edit):
 		// Edit secret in external editor from explorer

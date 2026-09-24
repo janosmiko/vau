@@ -65,6 +65,10 @@ type (
 		isCut   bool
 		isDir   bool
 	}
+	jumpCompletionsMsg struct {
+		input       string
+		completions []string
+	}
 )
 
 // TabState holds per-tab navigation state.

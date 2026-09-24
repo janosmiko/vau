@@ -72,6 +72,13 @@ func (m *Model) updateCoreResult(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			}
 		}
 		return m, nil, true
+
+	case jumpCompletionsMsg:
+		if msg.input == m.jumpLastInput {
+			m.jumpCompletions = msg.completions
+			m.jumpCompIdx = -1
+		}
+		return m, nil, true
 	}
 	return m, nil, false
 }

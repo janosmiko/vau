@@ -297,8 +297,7 @@ func (m *Model) handleJumpPathKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// If it's a directory, reload completions for that dir
 			if strings.HasSuffix(selected, "/") {
 				m.jumpCompletions = nil
-				m.loadJumpCompletions()
-				return m, nil
+				return m, m.loadJumpCompletions()
 			}
 			// If it's a secret, navigate to it
 			m.textInput.Blur()
@@ -337,13 +336,12 @@ func (m *Model) handleJumpPathKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.textInput, cmd = m.textInput.Update(msg)
 	m.jumpCompletions = nil
 	m.jumpCompIdx = -1
-	m.loadJumpCompletions()
-	return m, cmd
+	return m, tea.Batch(cmd, m.loadJumpCompletions())
 }
 
-// loadJumpCompletions lists the parent directory of the current input
-// and filters entries matching the typed prefix.
-func (m *Model) loadJumpCompletions() {
+// loadJumpCompletions returns a command that lists the parent directory of
+// the current input and filters entries matching the typed prefix.
+func (m *Model) loadJumpCompletions() tea.Cmd {
 	input := m.textInput.Value()
 	m.jumpLastInput = input
 
@@ -358,21 +356,21 @@ func (m *Model) loadJumpCompletions() {
 		prefix = input
 	}
 
-	entries, err := m.client.List(parentPath)
-	if err != nil || entries == nil {
-		m.jumpCompletions = nil
-		return
-	}
-
-	lowerPrefix := strings.ToLower(prefix)
-	var completions []string
-	for _, e := range entries {
-		if strings.HasPrefix(strings.ToLower(e.Name), lowerPrefix) {
-			completions = append(completions, parentPath+e.Name)
+	return func() tea.Msg {
+		entries, err := m.client.List(parentPath)
+		if err != nil || entries == nil {
+			return jumpCompletionsMsg{input: input}
 		}
+
+		lowerPrefix := strings.ToLower(prefix)
+		var completions []string
+		for _, e := range entries {
+			if strings.HasPrefix(strings.ToLower(e.Name), lowerPrefix) {
+				completions = append(completions, parentPath+e.Name)
+			}
+		}
+		return jumpCompletionsMsg{input: input, completions: completions}
 	}
-	m.jumpCompletions = completions
-	m.jumpCompIdx = -1
 }
 
 // jumpToPath navigates the explorer to the given Vault path.
