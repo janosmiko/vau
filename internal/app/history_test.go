@@ -37,3 +37,27 @@ func TestExecuteUndo_CutPaste_WritesBeforeDeleting(t *testing.T) {
 	_, restored := fv.get("original")
 	assert.False(t, restored, "the restore-write itself failed, so the original path must stay empty")
 }
+
+func TestCutPaste_UndoThenRedo_MovesSecretAgain(t *testing.T) {
+	c, fv := newFakeVault(t)
+	m := newTestModel()
+	m.client = c
+	fv.put("moved", map[string]string{"k": "v"})
+
+	undone := m.executeUndo(model.UndoAction{
+		Type:    model.UndoCutPaste,
+		Path:    "moved",
+		OldPath: "original",
+		Data:    map[string]string{"k": "v"},
+		Keys:    []string{"k"},
+	})()
+	redo, ok := undone.(redoableStatusMsg)
+	require.True(t, ok, "undo failed: %v", undone)
+
+	_ = m.executeRedo(redo.redo)()
+
+	_, atDst := fv.get("moved")
+	assert.True(t, atDst, "redo must write the secret back to the paste destination")
+	_, atSrc := fv.get("original")
+	assert.False(t, atSrc, "redo must delete the cut source again")
+}

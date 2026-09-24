@@ -282,10 +282,11 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 					OldPath:     action.Path,
 				}
 			} else {
-				if err := client.Write(action.Path, action.Data); err != nil {
+				// After undo, Path is the cut source and OldPath the paste destination.
+				if err := client.Write(action.OldPath, action.Data); err != nil {
 					return errorMsg("redo: " + err.Error())
 				}
-				if err := client.Delete(action.OldPath); err != nil {
+				if err := client.Delete(action.Path); err != nil {
 					return errorMsg("redo: " + err.Error())
 				}
 				reverse = model.UndoAction{
