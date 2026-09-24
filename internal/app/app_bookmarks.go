@@ -71,7 +71,7 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(filtered) > 0 && m.bookmarkCursor < len(filtered) {
 			bm := filtered[m.bookmarkCursor]
 			for i, b := range m.bookmarks {
-				if b.Mount == bm.Mount && b.Path == bm.Path {
+				if b.Slot == bm.Slot {
 					m.bookmarks = append(m.bookmarks[:i], m.bookmarks[i+1:]...)
 					break
 				}
