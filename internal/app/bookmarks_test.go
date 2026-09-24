@@ -114,3 +114,21 @@ func TestHandleMarkSave_New_SaveFailure_DoesNotAppend(t *testing.T) {
 	assert.Empty(t, m.bookmarks, "unsaved mark must not be appended in memory")
 	assert.NotEmpty(t, m.errMsg, "save failure must be reported")
 }
+
+// TestHandleMarkSave_RejectsUnreachableSlots covers j, k, and l: the overlay
+// consumes these keys for navigation before the quick-jump branch runs, so a
+// bookmark saved to one of these slots could never be jumped to.
+func TestHandleMarkSave_RejectsUnreachableSlots(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	for _, slot := range []string{"j", "k", "l"} {
+		t.Run(slot, func(t *testing.T) {
+			m := newTestModel()
+
+			m.handleMarkSave(slot)
+
+			assert.Empty(t, m.bookmarks, "slot %q is unreachable and must be rejected", slot)
+			assert.NotEmpty(t, m.status)
+		})
+	}
+}

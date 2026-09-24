@@ -193,6 +193,13 @@ func (m *Model) handleMarkSave(key string) (tea.Model, tea.Cmd) {
 		m.lastMarkAttempt = ""
 		return m, nil
 	}
+	// j, k, l are consumed by overlay navigation, so a mark saved to one of
+	// these slots could never be quick-jumped to.
+	if key == "j" || key == "k" || key == "l" {
+		m.status = "Mark '" + key + "' is reserved for navigation, use a different key"
+		m.lastMarkAttempt = ""
+		return m, nil
+	}
 	slot := key
 	mount := m.client.Mount()
 	path := m.currentPath()
