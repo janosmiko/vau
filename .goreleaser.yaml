@@ -101,6 +101,30 @@ changelog:
 checksum:
   name_template: "checksums.txt"
 
+# Keyless cosign signing via Sigstore + GitHub OIDC, needs id-token: write.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - "--yes"
+
+sboms:
+  - artifacts: archive
+
 release:
   github:
     owner: janosmiko
