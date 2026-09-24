@@ -53,7 +53,6 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 
 	if entry.IsDir {
 		operation := "Deleting"
-		total, _ := client.CountRecursive(path)
 
 		ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
 		m.progress = progressState{
@@ -61,7 +60,7 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 			cancel:    cancel,
 			operation: operation,
 			current:   0,
-			total:     total,
+			total:     0, // unknown until counted inside the cmd below
 		}
 
 		var reporter *progressReporter
@@ -70,6 +69,14 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 		}
 
 		return func() tea.Msg {
+			if err := ctx.Err(); err != nil {
+				return progressDoneMsg{operation: operation, err: err}
+			}
+			total, _ := client.CountRecursive(path)
+			if reporter != nil {
+				reporter.report(0, total)
+			}
+
 			counter := 0
 			var cb vault.ProgressCallback
 			if reporter != nil {
@@ -194,6 +201,21 @@ func (m *Model) createSecretWithEditor(path string) tea.Cmd {
 	}
 }
 
+// countYankTotal counts the items under yankPaths (best-effort) for progress
+// display, doubling for a cut since it involves a copy phase and a delete phase.
+func countYankTotal(client *vault.Client, yankPaths []string, isCut bool) int {
+	total := 0
+	for _, yp := range yankPaths {
+		if n, err := client.CountRecursive(yp); err == nil {
+			total += n
+		}
+	}
+	if isCut {
+		total *= 2
+	}
+	return total
+}
+
 func (m *Model) pasteSecrets() tea.Cmd {
 	isCut := m.yankIsCut
 	isDir := m.yankIsDir
@@ -211,25 +233,13 @@ func (m *Model) pasteSecrets() tea.Cmd {
 			operation = "Moving"
 		}
 
-		// Count total items for progress display (best-effort).
-		total := 0
-		for _, yp := range yankPaths {
-			n, err := client.CountRecursive(yp)
-			if err == nil {
-				total += n
-			}
-		}
-		if isCut {
-			total *= 2 // copy + delete phases
-		}
-
 		ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
 		m.progress = progressState{
 			active:    true,
 			cancel:    cancel,
 			operation: operation,
 			current:   0,
-			total:     total,
+			total:     0, // unknown until counted inside the cmd below
 		}
 
 		var reporter *progressReporter
@@ -238,6 +248,15 @@ func (m *Model) pasteSecrets() tea.Cmd {
 		}
 
 		return func() tea.Msg {
+			if err := ctx.Err(); err != nil {
+				return progressDoneMsg{operation: operation, err: err}
+			}
+
+			total := countYankTotal(client, yankPaths, isCut)
+			if reporter != nil {
+				reporter.report(0, total)
+			}
+
 			totalCount := 0
 			counter := 0
 			for _, yp := range yankPaths {
@@ -642,25 +661,13 @@ func (m *Model) bulkDelete(entries []model.Entry) tea.Cmd {
 	basePath := m.currentPath()
 	client := m.client
 
-	// Count total items for progress.
-	total := 0
-	for _, entry := range entries {
-		if entry.IsDir {
-			path := basePath + strings.TrimSuffix(entry.Name, "/")
-			n, _ := client.CountRecursive(path)
-			total += n
-		} else {
-			total++
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // cancel stored in m.progress.cancel
 	m.progress = progressState{
 		active:    true,
 		cancel:    cancel,
 		operation: operation,
 		current:   0,
-		total:     total,
+		total:     0, // unknown until counted inside the cmd below
 	}
 	m.selected = make(map[int]bool)
 
@@ -670,6 +677,25 @@ func (m *Model) bulkDelete(entries []model.Entry) tea.Cmd {
 	}
 
 	return func() tea.Msg {
+		if err := ctx.Err(); err != nil {
+			return progressDoneMsg{operation: operation, err: err}
+		}
+
+		// Count total items for progress.
+		total := 0
+		for _, entry := range entries {
+			if entry.IsDir {
+				path := basePath + strings.TrimSuffix(entry.Name, "/")
+				n, _ := client.CountRecursive(path)
+				total += n
+			} else {
+				total++
+			}
+		}
+		if reporter != nil {
+			reporter.report(0, total)
+		}
+
 		deleted := 0
 		counter := 0
 		for _, entry := range entries {
