@@ -21,11 +21,12 @@ type ProgressCallback func(current, total int)
 // ErrKV1NotSupported is returned when a KV v2-only operation is attempted on a KV v1 mount.
 var ErrKV1NotSupported = fmt.Errorf("operation not supported for KV v1 engine")
 
-// Client wraps the Vault API client.
+// Client wraps the Vault API client. The mount is fixed per value so a command
+// running on another goroutine keeps the mount it started with.
 type Client struct {
 	raw           *vaultapi.Client
 	mount         string
-	mountVersions map[string]int // cache: mount path -> KV version (1 or 2)
+	mountVersions *versionCache
 }
 
 // NewClient creates a new Vault client from environment variables.
@@ -62,7 +63,7 @@ func NewClient() (*Client, error) {
 	}
 	mount = strings.TrimSuffix(mount, "/")
 
-	return &Client{raw: raw, mount: mount, mountVersions: make(map[string]int)}, nil
+	return &Client{raw: raw, mount: mount, mountVersions: &versionCache{m: make(map[string]int)}}, nil
 }
 
 // Mount returns the configured mount path.
@@ -70,36 +71,11 @@ func (c *Client) Mount() string {
 	return c.mount
 }
 
-// SetMount changes the active mount path.
-func (c *Client) SetMount(mount string) {
-	c.mount = strings.TrimSuffix(mount, "/")
-}
-
-// getMountVersion detects and caches the KV engine version for the given mount.
-// It queries sys/mounts/{mount} and inspects options.version.
-// Returns 1 for KV v1 or 2 for KV v2 (the default).
-func (c *Client) getMountVersion(mount string) int {
-	if v, ok := c.mountVersions[mount]; ok {
-		return v
-	}
-	secret, err := c.raw.Logical().Read("sys/mounts/" + mount)
-	if err != nil || secret == nil {
-		c.mountVersions[mount] = 2
-		return 2
-	}
-	if options, ok := secret.Data["options"].(map[string]interface{}); ok {
-		if version, ok := options["version"].(string); ok && version == "1" {
-			c.mountVersions[mount] = 1
-			return 1
-		}
-	}
-	c.mountVersions[mount] = 2
-	return 2
-}
-
-// IsKV1 reports whether the current mount uses the KV v1 engine.
-func (c *Client) IsKV1() bool {
-	return c.getMountVersion(c.mount) == 1
+// WithMount returns a copy of the client that uses the given mount path.
+func (c *Client) WithMount(mount string) *Client {
+	cp := *c
+	cp.mount = strings.TrimSuffix(mount, "/")
+	return &cp
 }
 
 // ListMounts returns available KV secret engine mounts.
@@ -141,7 +117,7 @@ func (c *Client) ListWithMount(mount, path string) ([]model.Entry, error) {
 		return nil, nil
 	}
 
-	keysList, ok := keysRaw.([]interface{})
+	keysList, ok := keysRaw.([]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected keys type at %s", path)
 	}
@@ -168,13 +144,18 @@ func (c *Client) ListWithMount(mount, path string) ([]model.Entry, error) {
 
 // List returns entries at the given path within the KV engine.
 func (c *Client) List(path string) ([]model.Entry, error) {
+	return c.ListCtx(context.Background(), path)
+}
+
+// ListCtx is List with a context that can cancel the request.
+func (c *Client) ListCtx(ctx context.Context, path string) ([]model.Entry, error) {
 	var apiPath string
-	if c.getMountVersion(c.mount) == 1 {
+	if c.getMountVersionCtx(ctx, c.mount) == 1 {
 		apiPath = fmt.Sprintf("%s/%s", c.mount, path)
 	} else {
 		apiPath = fmt.Sprintf("%s/metadata/%s", c.mount, path)
 	}
-	secret, err := c.raw.Logical().List(apiPath)
+	secret, err := c.raw.Logical().ListWithContext(ctx, apiPath)
 	if err != nil {
 		return nil, fmt.Errorf("listing %s: %w", path, err)
 	}
@@ -187,7 +168,7 @@ func (c *Client) List(path string) ([]model.Entry, error) {
 		return nil, nil
 	}
 
-	keysList, ok := keysRaw.([]interface{})
+	keysList, ok := keysRaw.([]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected keys type at %s", path)
 	}
@@ -232,7 +213,7 @@ func (c *Client) Read(path string) (*model.Secret, error) {
 		return nil, fmt.Errorf("secret not found at %s", path)
 	}
 
-	var dataMap map[string]interface{}
+	var dataMap map[string]any
 	if isV1 {
 		// KV v1: data is directly in secret.Data
 		dataMap = secret.Data
@@ -242,7 +223,7 @@ func (c *Client) Read(path string) (*model.Secret, error) {
 		if !ok || dataRaw == nil {
 			return &model.Secret{Path: path, Data: make(map[string]string), Keys: nil}, nil
 		}
-		dataMap, ok = dataRaw.(map[string]interface{})
+		dataMap, ok = dataRaw.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected data type at %s", path)
 		}
@@ -268,19 +249,19 @@ func (c *Client) Write(path string, data map[string]string) error {
 	isV1 := c.getMountVersion(c.mount) == 1
 
 	var apiPath string
-	var payload map[string]interface{}
+	var payload map[string]any
 
 	if isV1 {
 		apiPath = fmt.Sprintf("%s/%s", c.mount, path)
 		// KV v1: write data directly
-		payload = make(map[string]interface{}, len(data))
+		payload = make(map[string]any, len(data))
 		for k, v := range data {
 			payload[k] = v
 		}
 	} else {
 		apiPath = fmt.Sprintf("%s/data/%s", c.mount, path)
 		// KV v2: wrap in {"data": ...}
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"data": data,
 		}
 	}
@@ -363,14 +344,14 @@ func (c *Client) ReadVersionMetadata(path string) ([]model.SecretVersion, error)
 		return nil, fmt.Errorf("no versions data at %s", path)
 	}
 
-	versionsMap, ok := versionsRaw.(map[string]interface{})
+	versionsMap, ok := versionsRaw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected versions type at %s", path)
 	}
 
 	var versions []model.SecretVersion
 	for vNum, vData := range versionsMap {
-		vMap, ok := vData.(map[string]interface{})
+		vMap, ok := vData.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -420,7 +401,7 @@ func (c *Client) ReadVersion(path string, version int) (*model.Secret, error) {
 		return &model.Secret{Path: path, Data: make(map[string]string), Keys: nil}, nil
 	}
 
-	dataMap, ok := dataRaw.(map[string]interface{})
+	dataMap, ok := dataRaw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected data type at %s v%d", path, version)
 	}
@@ -442,11 +423,11 @@ func (c *Client) DestroyVersions(path string, versions []int) error {
 		return ErrKV1NotSupported
 	}
 	apiPath := fmt.Sprintf("%s/destroy/%s", c.mount, path)
-	versionStrs := make([]interface{}, len(versions))
+	versionStrs := make([]any, len(versions))
 	for i, v := range versions {
 		versionStrs[i] = v
 	}
-	_, err := c.raw.Logical().Write(apiPath, map[string]interface{}{
+	_, err := c.raw.Logical().Write(apiPath, map[string]any{
 		"versions": versionStrs,
 	})
 	if err != nil {
@@ -606,8 +587,14 @@ func (c *Client) MoveRecursive(src, dst string) (int, error) {
 }
 
 // CountRecursive counts the total number of secrets under a path (including the path itself if it's a secret).
-func (c *Client) CountRecursive(path string) (int, error) {
-	entries, err := c.List(path)
+func (c *Client) CountRecursive(ctx context.Context, path string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	entries, err := c.ListCtx(ctx, path)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return 0, ctxErr
+	}
 	if entries == nil || err != nil {
 		// Not a directory or List failed — treat as a single secret.
 		return 1, nil //nolint:nilerr // List error means it's a single secret, not a real error
@@ -622,7 +609,7 @@ func (c *Client) CountRecursive(path string) (int, error) {
 	for _, e := range entries {
 		childPath := dirPath + e.Name
 		if e.IsDir {
-			n, err := c.CountRecursive(strings.TrimSuffix(childPath, "/"))
+			n, err := c.CountRecursive(ctx, strings.TrimSuffix(childPath, "/"))
 			if err != nil {
 				return count, err
 			}

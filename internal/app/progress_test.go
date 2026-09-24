@@ -114,6 +114,18 @@ func TestProgressDoneMsgCancelled(t *testing.T) {
 	assert.Empty(t, resultModel.errMsg)
 }
 
+func TestProgressDoneMsgReleasesContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	m := &Model{
+		width:    80,
+		progress: progressState{active: true, cancel: cancel, operation: "Copying"},
+	}
+
+	m.Update(progressDoneMsg{operation: "Copying", count: 1, status: "Copied 1 items"})
+
+	assert.ErrorIs(t, ctx.Err(), context.Canceled)
+}
+
 func TestProgressDoneMsgSuccess(t *testing.T) {
 	m := &Model{
 		width:  80,

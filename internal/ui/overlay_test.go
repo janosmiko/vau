@@ -481,9 +481,9 @@ func TestRenderInputOverlayWidthClamped(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRenderThemePickerOverlayScrolling(t *testing.T) {
-	entries := make([]ThemeEntry, 0)
+	entries := make([]ThemeEntry, 0, 31)
 	entries = append(entries, ThemeEntry{Name: "Dark Themes", IsHeader: true})
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		entries = append(entries, ThemeEntry{Name: "theme-" + string(rune('a'+i%26))})
 	}
 	// Cursor near bottom, small height forces scrolling
@@ -519,8 +519,7 @@ func TestRenderThemePickerOverlayNoActiveTheme(t *testing.T) {
 	}
 	result := RenderThemePickerOverlay(entries, 1, "", 80, 40)
 	// No asterisk marker should appear on nord since activeTheme is empty
-	lines := strings.Split(result, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(result, "\n") {
 		if strings.Contains(line, "nord") {
 			assert.NotContains(t, line, "*")
 		}

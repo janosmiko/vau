@@ -252,7 +252,7 @@ When editing a key-value pair (`e`) or adding a new one (`a`):
 
 ### Marks (`m` / `'`)
 
-Vim-style named marks for quick navigation. Press `m` followed by a slot key (`a-z`, `0-9`) to set a mark at the current location. If the slot is already occupied, you will be prompted to press the same combo again to overwrite. Press `'` to open the marks overlay where you can browse all saved marks. Inside the overlay, pressing a slot key (`a-z`, `0-9`) performs a quick jump to that mark.
+Vim-style named marks for quick navigation. Press `m` followed by a slot key (`a-z`, `0-9`) to set a mark at the current location. The overlay uses `j`, `k` and `l` for navigation, so they are not valid slots. If the slot is already occupied, you will be prompted to press the same combo again to overwrite. Press `'` to open the marks overlay where you can browse all saved marks. Inside the overlay, pressing a slot key (`a-z`, `0-9`) performs a quick jump to that mark.
 
 | Key | Action |
 |---|---|
@@ -467,7 +467,7 @@ The `keybindings` section maps action names to key strings. Each override replac
 | `next_tab` | `]` | Switch to next tab |
 | `prev_tab` | `[` | Switch to previous tab |
 | `close_tab` | `ctrl+c` | Close tab (quit if last) |
-| `bookmark_save` | `m` | Set mark (+ slot key a-z, 0-9) |
+| `bookmark_save` | `m` | Set mark (+ slot key a-z, 0-9, not j/k/l) |
 | `bookmark_show` | `'` | Open marks overlay |
 | `theme_picker` | `T` | Open colorscheme picker |
 

@@ -364,7 +364,8 @@ func GroupedThemeEntries() []ThemeEntry {
 	sort.Strings(dark)
 	sort.Strings(light)
 
-	entries := []ThemeEntry{{Name: "Dark Themes", IsHeader: true}}
+	entries := make([]ThemeEntry, 0, 1+len(dark)+1+len(light))
+	entries = append(entries, ThemeEntry{Name: "Dark Themes", IsHeader: true})
 	for _, name := range dark {
 		entries = append(entries, ThemeEntry{Name: name})
 	}

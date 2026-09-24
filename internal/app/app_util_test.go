@@ -1051,7 +1051,7 @@ func TestUpdate_VersionHistoryMsg_Success(t *testing.T) {
 		{Version: "2", CreatedTime: "2024-01-02"},
 	}
 
-	result, cmd := m.Update(versionHistoryMsg{versions: versions})
+	result, cmd := m.Update(versionHistoryMsg{mount: "secret", versions: versions})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeVersionHistory, resultModel.mode)
@@ -1062,7 +1062,7 @@ func TestUpdate_VersionHistoryMsg_Success(t *testing.T) {
 
 func TestUpdate_VersionHistoryMsg_Error(t *testing.T) {
 	m := newTestModel()
-	result, cmd := m.Update(versionHistoryMsg{err: assert.AnError})
+	result, cmd := m.Update(versionHistoryMsg{mount: "secret", err: assert.AnError})
 	resultModel := result.(*Model)
 
 	assert.Contains(t, resultModel.errMsg, "assert.AnError")
@@ -1077,7 +1077,7 @@ func TestUpdate_VersionDetailMsg_Success(t *testing.T) {
 		Data: map[string]string{"key1": "val1"},
 	}
 
-	result, cmd := m.Update(versionDetailMsg{version: 2, secret: secret})
+	result, cmd := m.Update(versionDetailMsg{mount: "secret", version: 2, secret: secret})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeSecret, resultModel.mode)
@@ -1092,7 +1092,7 @@ func TestUpdate_VersionDetailMsg_Success(t *testing.T) {
 
 func TestUpdate_VersionDetailMsg_Error(t *testing.T) {
 	m := newTestModel()
-	result, _ := m.Update(versionDetailMsg{err: assert.AnError})
+	result, _ := m.Update(versionDetailMsg{mount: "secret", err: assert.AnError})
 	assert.Contains(t, result.(*Model).errMsg, "assert.AnError")
 }
 
@@ -1193,6 +1193,7 @@ func TestHandleListResult_MountPreview(t *testing.T) {
 
 	entries := []model.Entry{{Name: "subdir/", IsDir: true}}
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "@@mount_preview@@",
 		entries: entries,
 	})
@@ -1208,8 +1209,9 @@ func TestHandleListResult_MountPreview_Error(t *testing.T) {
 	m.previewEntries = []model.Entry{{Name: "old/"}}
 
 	result, cmd := m.handleListResult(listResultMsg{
-		path: "@@mount_preview@@",
-		err:  assert.AnError,
+		mount: "secret",
+		path:  "@@mount_preview@@",
+		err:   assert.AnError,
 	})
 	resultModel := result.(*Model)
 
@@ -1221,8 +1223,9 @@ func TestHandleListResult_MountPreview_Error(t *testing.T) {
 func TestHandleListResult_Error(t *testing.T) {
 	m := newTestModel()
 	result, cmd := m.handleListResult(listResultMsg{
-		path: "some/path/",
-		err:  assert.AnError,
+		mount: "secret",
+		path:  "some/path/",
+		err:   assert.AnError,
 	})
 	resultModel := result.(*Model)
 
@@ -1233,11 +1236,14 @@ func TestHandleListResult_Error(t *testing.T) {
 func TestHandleListResult_PreviewResult(t *testing.T) {
 	m := newTestModel()
 	m.path = []string{"dir/"}
+	m.entries = []model.Entry{{Name: "sub/", IsDir: true}}
+	m.cursor = 0
 	m.previewSecret = &model.Secret{Path: "old-preview"}
 
 	entries := []model.Entry{{Name: "preview-item", IsDir: false}}
 	result, cmd := m.handleListResult(listResultMsg{
-		path:    "other/path/",
+		mount:   "secret",
+		path:    "dir/sub/",
 		entries: entries,
 	})
 	resultModel := result.(*Model)
@@ -1257,6 +1263,7 @@ func TestHandleListResult_ParentResult(t *testing.T) {
 		{Name: "data/", IsDir: true},
 	}
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "secret/",
 		entries: parentEntries,
 	})
@@ -1274,7 +1281,7 @@ func TestHandleListResult_ParentResult(t *testing.T) {
 
 func TestHandleSecretResult_Error(t *testing.T) {
 	m := newTestModel()
-	result, cmd := m.handleSecretResult(secretResultMsg{err: assert.AnError})
+	result, cmd := m.handleSecretResult(secretResultMsg{mount: "secret", err: assert.AnError})
 	resultModel := result.(*Model)
 
 	assert.Contains(t, resultModel.errMsg, "assert.AnError")
@@ -1290,6 +1297,7 @@ func TestHandleSecretResult_OpenPopup(t *testing.T) {
 	}
 
 	result, cmd := m.handleSecretResult(secretResultMsg{
+		mount:     "secret",
 		secret:    secret,
 		openPopup: true,
 	})
@@ -1308,6 +1316,8 @@ func TestHandleSecretResult_OpenPopup(t *testing.T) {
 func TestHandleSecretResult_Preview(t *testing.T) {
 	m := newTestModel()
 	m.mode = model.ModeExplorer
+	m.entries = []model.Entry{{Name: "preview", IsDir: false}}
+	m.cursor = 0
 
 	secret := &model.Secret{
 		Path: "secret/preview",
@@ -1316,6 +1326,8 @@ func TestHandleSecretResult_Preview(t *testing.T) {
 	}
 
 	result, _ := m.handleSecretResult(secretResultMsg{
+		mount:     "secret",
+		path:      "preview",
 		secret:    secret,
 		openPopup: false,
 	})
@@ -1738,6 +1750,8 @@ func TestHandleKey_SecretEdit_Esc(t *testing.T) {
 func TestHandleSecretResult_Preview_ClearsPreviewEntries(t *testing.T) {
 	m := newTestModel()
 	m.previewEntries = []model.Entry{{Name: "old/"}}
+	m.entries = []model.Entry{{Name: "preview", IsDir: false}}
+	m.cursor = 0
 
 	secret := &model.Secret{
 		Path: "secret/preview",
@@ -1745,7 +1759,7 @@ func TestHandleSecretResult_Preview_ClearsPreviewEntries(t *testing.T) {
 		Data: map[string]string{"k": "v"},
 	}
 
-	result, _ := m.handleSecretResult(secretResultMsg{secret: secret, openPopup: false})
+	result, _ := m.handleSecretResult(secretResultMsg{mount: "secret", path: "preview", secret: secret, openPopup: false})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, secret, resultModel.previewSecret)
@@ -1767,6 +1781,7 @@ func TestHandleListResult_CurrentPath(t *testing.T) {
 		{Name: "beta/", IsDir: true},
 	}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -1782,6 +1797,7 @@ func TestHandleListResult_CurrentPath_CursorBeyondRange(t *testing.T) {
 
 	newEntries := []model.Entry{{Name: "only-one", IsDir: false}}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -1800,6 +1816,7 @@ func TestHandleListResult_CurrentPath_WithFilter(t *testing.T) {
 		{Name: "beta", IsDir: false},
 	}
 	result, _ := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/",
 		entries: newEntries,
 	})
@@ -2154,6 +2171,7 @@ func TestHandleListResult_EmptyDir_NavigatesUp(t *testing.T) {
 	m.path = []string{"dir/", "subdir/"}
 
 	result, cmd := m.handleListResult(listResultMsg{
+		mount:   "secret",
 		path:    "dir/subdir/",
 		entries: []model.Entry{}, // empty dir
 	})
@@ -2335,7 +2353,7 @@ func TestUpdate_EditorResultMsg_NilSecret(t *testing.T) {
 func TestUpdate_NewSecretEditorMsg(t *testing.T) {
 	m := newTestModel()
 	// This returns a cmd that calls openEditorForNewSecret
-	result, cmd := m.Update(newSecretEditorMsg("secret/new-path"))
+	result, cmd := m.Update(newSecretEditorMsg{path: "secret/new-path", mount: m.client.Mount()})
 	assert.Equal(t, m, result)
 	assert.NotNil(t, cmd, "should return cmd to open editor")
 }
@@ -2985,7 +3003,7 @@ func TestHandleThemePickerKey_Esc(t *testing.T) {
 	m.themeCursor = 0
 	m.activeColorscheme = "dracula"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEsc})
 	assert.Equal(t, model.ModeExplorer, result.(*Model).mode)
 }
 
@@ -2996,7 +3014,7 @@ func TestHandleThemePickerKey_Q(t *testing.T) {
 	m.themeCursor = 0
 	m.activeColorscheme = "dracula"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	assert.Equal(t, model.ModeExplorer, result.(*Model).mode)
 }
 
@@ -3010,7 +3028,7 @@ func TestHandleThemePickerKey_Enter(t *testing.T) {
 	m.themeCursor = 1
 	m.activeColorscheme = "monokai"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEnter})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEnter})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeExplorer, resultModel.mode)
@@ -3052,9 +3070,8 @@ func TestHandleThemePickerKey_UnknownKey(t *testing.T) {
 	m.themeEntries = []ui.ThemeEntry{{Name: "dracula", IsHeader: false}}
 	m.themeCursor = 0
 
-	result, cmd := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	assert.Equal(t, m, result)
-	assert.Nil(t, cmd)
 }
 
 // ---------------------------------------------------------------------------

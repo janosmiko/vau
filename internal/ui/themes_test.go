@@ -2,6 +2,7 @@ package ui
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ func TestGetThemeValid(t *testing.T) {
 	// Verify all fields are populated.
 	v := reflect.ValueOf(theme)
 	typ := v.Type()
-	for i := 0; i < v.NumField(); i++ {
+	for i := range v.NumField() {
 		fieldVal := v.Field(i).String()
 		fieldName := typ.Field(i).Name
 		assert.NotEmpty(t, fieldVal, "theme field %s should not be empty", fieldName)
@@ -43,7 +44,7 @@ func TestAllBuiltinThemesHaveAllFields(t *testing.T) {
 
 		v := reflect.ValueOf(theme)
 		typ := v.Type()
-		for i := 0; i < v.NumField(); i++ {
+		for i := range v.NumField() {
 			fieldVal := v.Field(i).String()
 			fieldName := typ.Field(i).Name
 			assert.NotEmpty(t, fieldVal, "theme %q field %s should not be empty", name, fieldName)
@@ -140,14 +141,7 @@ func TestLightThemesCorrectlyClassified(t *testing.T) {
 
 	// Verify that no other themes are marked as light.
 	for name := range builtinThemes {
-		isExpectedLight := false
-		for _, ln := range expectedLight {
-			if name == ln {
-				isExpectedLight = true
-				break
-			}
-		}
-		if isExpectedLight {
+		if slices.Contains(expectedLight, name) {
 			assert.True(t, lightThemes[name])
 		} else {
 			assert.False(t, lightThemes[name], "%q should not be classified as a light theme", name)

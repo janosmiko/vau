@@ -260,7 +260,7 @@ func helpSections() []helpSection {
 				{"]", "Switch to next tab"},
 				{"Ctrl+C", "Close tab (quit if last)"},
 				{"'", "Open marks (quick jump with slot key)"},
-				{"m", "Set mark (+ slot key a-z, 0-9)"},
+				{"m", "Set mark (+ slot key a-z, 0-9, not j/k/l)"},
 				{"T", "Change colorscheme"},
 				{"?", "Show this help screen"},
 				{"q", "Quit"},

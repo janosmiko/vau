@@ -1,5 +1,7 @@
 package app
 
+import "slices"
+
 // KeyMap holds all configurable keybindings. Each field is a list of key
 // strings that trigger the action (first match wins). Users override
 // individual actions via the "keybindings" map in config.yaml; an override
@@ -164,10 +166,5 @@ func (km *KeyMap) ApplyOverrides(overrides map[string]string) {
 
 // matchKey reports whether key matches any of the configured bindings.
 func matchKey(key string, bindings []string) bool {
-	for _, b := range bindings {
-		if key == b {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(bindings, key)
 }
