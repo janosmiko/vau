@@ -13,6 +13,13 @@ type Secret struct {
 	Keys []string // ordered keys for stable display
 }
 
+// DockerConfigField is one credential field of one registry in a dockerconfigjson value.
+type DockerConfigField struct {
+	Registry string
+	Name     string
+	Value    string
+}
+
 // PreviewMode controls how the right-pane preview renders secrets.
 type PreviewMode int
 
@@ -50,6 +57,7 @@ const (
 	ModeTokenList      // token accessor list
 	ModeTokenView      // viewing a single token's accessor metadata
 	ModeTokenCreated   // showing newly created token (one-time view)
+	ModeDockerConfig   // registry credentials of a dockerconfigjson value
 )
 
 // UndoType represents the kind of action that can be undone.

@@ -43,6 +43,7 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"v", "toggle"},
 			{"V", "json"},
 			{"b", "b64"},
+			{"d", "docker"},
 			{"y", "copy"},
 			{"Y", "copy as"},
 			{"p", "paste"},
@@ -64,6 +65,13 @@ func HelpBar(mode model.ViewMode, width int) string {
 			{"Enter", "view version"},
 			{"D", "destroy ver"},
 			{"Ctrl+X", "clear old"},
+			{"esc", "back"},
+		}
+	case model.ModeDockerConfig:
+		bindings = []helpBinding{
+			{"jk", "nav"},
+			{"v", "toggle"},
+			{"y", "copy"},
 			{"esc", "back"},
 		}
 	case model.ModeThemePicker:
@@ -272,6 +280,7 @@ func helpSections() []helpSection {
 				{"v / Tab", "Toggle value visibility"},
 				{"V", "Toggle JSON view"},
 				{"b", "Toggle base64 decode"},
+				{"d", "View dockerconfigjson credentials"},
 				{"y", "Copy value (or JSON in JSON view)"},
 				{"Y", "Copy secret as... (j)son (y)aml (d)otenv"},
 				{"p", "Paste clipboard as value"},
@@ -294,6 +303,15 @@ func helpSections() []helpSection {
 				{"D", "Destroy selected version (permanent)"},
 				{"Ctrl+X", "Destroy all old versions (keep latest)"},
 				{"Esc", "Close version history"},
+			},
+		},
+		{
+			title: "Docker Config (d)",
+			bindings: []helpBinding{
+				{"j / k", "Navigate fields"},
+				{"v / Tab", "Toggle secret visibility"},
+				{"y", "Copy selected field"},
+				{"Esc / q / h", "Back to secret popup"},
 			},
 		},
 		{
