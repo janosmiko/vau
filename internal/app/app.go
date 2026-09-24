@@ -1227,8 +1227,8 @@ func (m *Model) headerLineCount() int {
 }
 
 func (m *Model) explorerColHeight() int {
-	// Must match RenderExplorer: height(m.height-2) - 3 - headerLines
-	h := m.height - 5 - m.headerLineCount()
+	// Must match RenderExplorer: height(m.height-2) - 2 - headerLines
+	h := m.height - 4 - m.headerLineCount()
 	if h < 1 {
 		h = 1
 	}

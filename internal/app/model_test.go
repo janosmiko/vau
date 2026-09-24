@@ -718,8 +718,8 @@ func TestExplorerColHeight(t *testing.T) {
 		nTabs  int
 		want   int
 	}{
-		{name: "normal height single tab", height: 40, nTabs: 1, want: 40 - 5 - 1},
-		{name: "normal height multi tab", height: 40, nTabs: 2, want: 40 - 5 - 2},
+		{name: "normal height single tab", height: 40, nTabs: 1, want: 40 - 4 - 1},
+		{name: "normal height multi tab", height: 40, nTabs: 2, want: 40 - 4 - 2},
 		{name: "very small height", height: 4, nTabs: 1, want: 1},
 		{name: "zero height", height: 0, nTabs: 1, want: 1},
 	}
@@ -1563,7 +1563,7 @@ func TestSecretPopupHalfPage_VeryTallTerminal(t *testing.T) {
 
 func TestExplorerColHeight_NegativeResult(t *testing.T) {
 	m := newTestModel()
-	// height - 5 - 1 = -2, clamps to 1
+	// height - 4 - 1 = -1, clamps to 1
 	m.height = 4
 	assert.Equal(t, 1, m.explorerColHeight())
 }

@@ -182,7 +182,7 @@ func RenderExplorer(
 		rightW = 10
 	}
 
-	colHeight := height - 3 - headerLines // header lines + borders(2) + padding(1)
+	colHeight := height - 2 - headerLines // header lines + borders(2)
 
 	leftCol := renderEntryList(parentEntries, parentIdx, nil, leftW, colHeight, false, "")
 	midCol := renderEntryList(currentEntries, currentIdx, selected, midW, colHeight, true, highlightQuery)
@@ -410,7 +410,7 @@ func computeThreeColumnLayout(breadcrumb string, version string, tabLabels []str
 	leftW := max(usable*12/100, 10)
 	midW := max(usable*51/100, 10)
 	rightW := max(usable-leftW-midW, 10)
-	colHeight := height - 3 - headerLines
+	colHeight := height - 2 - headerLines
 
 	return threeColumnLayout{
 		header:    header,
