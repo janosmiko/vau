@@ -289,6 +289,7 @@ func (m *Model) pasteSecrets() tea.Cmd {
 		}
 
 		pastedCount := 0
+		lastDst := ""
 		for _, yanked := range yankedSecrets {
 			parts := strings.Split(strings.TrimSuffix(yanked.Path, "/"), "/")
 			name := parts[len(parts)-1]
@@ -316,13 +317,12 @@ func (m *Model) pasteSecrets() tea.Cmd {
 				}
 			}
 			pastedCount++
+			lastDst = dst
 		}
 
 		if pastedCount == 1 {
 			yanked := yankedSecrets[0]
-			parts := strings.Split(strings.TrimSuffix(yanked.Path, "/"), "/")
-			name := parts[len(parts)-1]
-			dst := basePath + name
+			dst := lastDst
 			if isCut {
 				return undoableStatusMsg{
 					status: fmt.Sprintf("Moved %s → %s", yanked.Path, dst),
