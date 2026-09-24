@@ -15,7 +15,7 @@ import (
 )
 
 // newTestClient creates a minimal vault.Client with only the mount field set.
-// This is safe for pure-function tests that only call Mount() / SetMount().
+// This is safe for pure-function tests that only call Mount() / WithMount().
 //
 //nolint:gosec,unparam // unsafe is intentional for test-only access to unexported field; mount always "secret" in tests
 func newTestClient(mount string) *vault.Client {
@@ -28,7 +28,7 @@ func newTestClient(mount string) *vault.Client {
 }
 
 // newTestModel creates a minimal Model suitable for pure-function testing.
-// The vault client only supports Mount()/SetMount(); do not call methods that
+// The vault client only supports Mount()/WithMount(); do not call methods that
 // hit the Vault API.
 func newTestModel() *Model {
 	si := textinput.New()

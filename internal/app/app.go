@@ -409,7 +409,7 @@ func (m *Model) loadTab(idx int) {
 	m.filteredIdx = append([]int(nil), t.filteredIdx...)
 	m.atMountLevel = t.atMountLevel
 	m.mountCursor = t.mountCursor
-	m.client.SetMount(t.mount)
+	m.client = m.client.WithMount(t.mount)
 
 	// Workspace state
 	m.policies = append([]string(nil), t.policies...)

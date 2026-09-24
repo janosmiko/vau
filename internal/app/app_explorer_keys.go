@@ -50,7 +50,7 @@ func (m *Model) handleMountKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			// KV mount
 			mountName := strings.TrimSuffix(selected.Name, "/")
-			m.client.SetMount(mountName)
+			m.client = m.client.WithMount(mountName)
 			m.atMountLevel = false
 			m.path = nil
 			m.cursor = 0

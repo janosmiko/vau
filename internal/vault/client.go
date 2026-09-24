@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/janosmiko/vau/internal/model"
 
@@ -21,11 +22,18 @@ type ProgressCallback func(current, total int)
 // ErrKV1NotSupported is returned when a KV v2-only operation is attempted on a KV v1 mount.
 var ErrKV1NotSupported = fmt.Errorf("operation not supported for KV v1 engine")
 
-// Client wraps the Vault API client.
+// Client wraps the Vault API client. The mount is fixed per value so a command
+// running on another goroutine keeps the mount it started with.
 type Client struct {
 	raw           *vaultapi.Client
 	mount         string
-	mountVersions map[string]int // cache: mount path -> KV version (1 or 2)
+	mountVersions *versionCache
+}
+
+// versionCache maps mount path -> KV version (1 or 2). Copies of a Client share it.
+type versionCache struct {
+	mu sync.Mutex
+	m  map[string]int
 }
 
 // NewClient creates a new Vault client from environment variables.
@@ -62,7 +70,7 @@ func NewClient() (*Client, error) {
 	}
 	mount = strings.TrimSuffix(mount, "/")
 
-	return &Client{raw: raw, mount: mount, mountVersions: make(map[string]int)}, nil
+	return &Client{raw: raw, mount: mount, mountVersions: &versionCache{m: make(map[string]int)}}, nil
 }
 
 // Mount returns the configured mount path.
@@ -70,31 +78,36 @@ func (c *Client) Mount() string {
 	return c.mount
 }
 
-// SetMount changes the active mount path.
-func (c *Client) SetMount(mount string) {
-	c.mount = strings.TrimSuffix(mount, "/")
+// WithMount returns a copy of the client that uses the given mount path.
+func (c *Client) WithMount(mount string) *Client {
+	cp := *c
+	cp.mount = strings.TrimSuffix(mount, "/")
+	return &cp
 }
 
 // getMountVersion detects and caches the KV engine version for the given mount.
 // It queries sys/mounts/{mount} and inspects options.version.
 // Returns 1 for KV v1 or 2 for KV v2 (the default).
 func (c *Client) getMountVersion(mount string) int {
-	if v, ok := c.mountVersions[mount]; ok {
+	c.mountVersions.mu.Lock()
+	v, ok := c.mountVersions.m[mount]
+	c.mountVersions.mu.Unlock()
+	if ok {
 		return v
 	}
+	v = 2
 	secret, err := c.raw.Logical().Read("sys/mounts/" + mount)
-	if err != nil || secret == nil {
-		c.mountVersions[mount] = 2
-		return 2
-	}
-	if options, ok := secret.Data["options"].(map[string]any); ok {
-		if version, ok := options["version"].(string); ok && version == "1" {
-			c.mountVersions[mount] = 1
-			return 1
+	if err == nil && secret != nil {
+		if options, ok := secret.Data["options"].(map[string]any); ok {
+			if version, ok := options["version"].(string); ok && version == "1" {
+				v = 1
+			}
 		}
 	}
-	c.mountVersions[mount] = 2
-	return 2
+	c.mountVersions.mu.Lock()
+	c.mountVersions.m[mount] = v
+	c.mountVersions.mu.Unlock()
+	return v
 }
 
 // IsKV1 reports whether the current mount uses the KV v1 engine.

@@ -321,7 +321,7 @@ func (m *Model) jumpToBookmark(bm config.Bookmark) tea.Cmd {
 
 	// Switch mount if needed
 	if bm.Mount != m.client.Mount() {
-		m.client.SetMount(bm.Mount)
+		m.client = m.client.WithMount(bm.Mount)
 	}
 	m.atMountLevel = false
 

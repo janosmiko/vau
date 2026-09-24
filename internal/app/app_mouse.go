@@ -262,7 +262,7 @@ func (m *Model) handleMountLevelClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			if isAccessCategory(selected.Name) {
 				return m.enterAccessCategory(selected.Name)
 			}
-			m.client.SetMount(strings.TrimSuffix(selected.Name, "/"))
+			m.client = m.client.WithMount(strings.TrimSuffix(selected.Name, "/"))
 			m.atMountLevel = false
 			m.path = nil
 			m.cursor = 0
