@@ -1233,11 +1233,13 @@ func TestHandleListResult_Error(t *testing.T) {
 func TestHandleListResult_PreviewResult(t *testing.T) {
 	m := newTestModel()
 	m.path = []string{"dir/"}
+	m.entries = []model.Entry{{Name: "sub/", IsDir: true}}
+	m.cursor = 0
 	m.previewSecret = &model.Secret{Path: "old-preview"}
 
 	entries := []model.Entry{{Name: "preview-item", IsDir: false}}
 	result, cmd := m.handleListResult(listResultMsg{
-		path:    "other/path/",
+		path:    "dir/sub/",
 		entries: entries,
 	})
 	resultModel := result.(*Model)
@@ -1308,6 +1310,8 @@ func TestHandleSecretResult_OpenPopup(t *testing.T) {
 func TestHandleSecretResult_Preview(t *testing.T) {
 	m := newTestModel()
 	m.mode = model.ModeExplorer
+	m.entries = []model.Entry{{Name: "preview", IsDir: false}}
+	m.cursor = 0
 
 	secret := &model.Secret{
 		Path: "secret/preview",
@@ -1316,6 +1320,7 @@ func TestHandleSecretResult_Preview(t *testing.T) {
 	}
 
 	result, _ := m.handleSecretResult(secretResultMsg{
+		path:      "preview",
 		secret:    secret,
 		openPopup: false,
 	})
@@ -1738,6 +1743,8 @@ func TestHandleKey_SecretEdit_Esc(t *testing.T) {
 func TestHandleSecretResult_Preview_ClearsPreviewEntries(t *testing.T) {
 	m := newTestModel()
 	m.previewEntries = []model.Entry{{Name: "old/"}}
+	m.entries = []model.Entry{{Name: "preview", IsDir: false}}
+	m.cursor = 0
 
 	secret := &model.Secret{
 		Path: "secret/preview",
@@ -1745,7 +1752,7 @@ func TestHandleSecretResult_Preview_ClearsPreviewEntries(t *testing.T) {
 		Data: map[string]string{"k": "v"},
 	}
 
-	result, _ := m.handleSecretResult(secretResultMsg{secret: secret, openPopup: false})
+	result, _ := m.handleSecretResult(secretResultMsg{path: "preview", secret: secret, openPopup: false})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, secret, resultModel.previewSecret)

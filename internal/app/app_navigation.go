@@ -277,6 +277,9 @@ func (m *Model) handleListResult(msg listResultMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Must be a preview result
+	if e := m.selectedEntry(); e == nil || m.currentPath()+e.Name != msg.path {
+		return m, nil
+	}
 	m.previewEntries = msg.entries
 	m.previewSecret = nil
 	return m, nil
@@ -308,6 +311,9 @@ func (m *Model) handleSecretResult(msg secretResultMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Preview result
+	if e := m.selectedEntry(); e == nil || e.IsDir || m.currentPath()+e.Name != msg.path {
+		return m, nil
+	}
 	m.previewSecret = msg.secret
 	m.previewEntries = nil
 	return m, nil
