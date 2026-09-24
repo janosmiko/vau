@@ -1,0 +1,25 @@
+# With the default GITHUB_TOKEN, GitHub blocks CI from triggering on the
+# bot's own Release PR (anti-recursion safeguard). Set RELEASE_PLEASE_TOKEN
+# to a fine-grained PAT to get CI on that PR.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
