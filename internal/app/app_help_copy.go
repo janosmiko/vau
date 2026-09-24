@@ -2,13 +2,13 @@ package app
 
 import (
 	"encoding/json"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/vau/internal/model"
 	"github.com/janosmiko/vau/internal/ui"
+	"gopkg.in/yaml.v3"
 )
 
 func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -115,17 +115,18 @@ func (m *Model) copySecretAsJSON() tea.Cmd {
 
 // formatSecretAsYAML renders secret key-value pairs as YAML text.
 func formatSecretAsYAML(secret *model.Secret) string {
-	var buf strings.Builder
+	node := &yaml.Node{Kind: yaml.MappingNode}
 	for _, k := range secret.Keys {
-		v := secret.Data[k]
-		// Quote values that contain special YAML characters or are empty
-		if v == "" || strings.ContainsAny(v, ":#{}[]&*!|>'\",\n") || v == "true" || v == "false" || v == "null" {
-			buf.WriteString(k + ": " + strconv.Quote(v) + "\n")
-		} else {
-			buf.WriteString(k + ": " + v + "\n")
-		}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: k},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: secret.Data[k]},
+		)
 	}
-	return buf.String()
+	out, err := yaml.Marshal(node)
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
 
 func (m *Model) copySecretAsYAML() tea.Cmd {
