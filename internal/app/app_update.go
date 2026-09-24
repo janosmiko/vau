@@ -28,6 +28,9 @@ func (m *Model) updateSizeProgress(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 	case progressDoneMsg:
 		m.progress.active = false
+		if m.progress.cancel != nil {
+			m.progress.cancel()
+		}
 		m.progress.cancel = nil
 		if msg.err != nil {
 			if errors.Is(msg.err, context.Canceled) {
