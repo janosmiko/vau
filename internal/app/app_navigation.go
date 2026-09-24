@@ -162,8 +162,8 @@ func (m *Model) listDir(path string) tea.Cmd {
 }
 
 func (m *Model) listParent() tea.Cmd {
+	pp := m.parentPath()
 	return func() tea.Msg {
-		pp := m.parentPath()
 		entries, err := m.client.List(pp)
 		if err != nil {
 			return nil
