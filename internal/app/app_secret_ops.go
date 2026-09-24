@@ -431,24 +431,20 @@ func (m *Model) editorCommand() (string, error) {
 	if len(parts) == 0 {
 		return "", fmt.Errorf("editor is empty")
 	}
-	if _, err := exec.LookPath(parts[0]); err != nil {
-		return "", fmt.Errorf("editor %q not found in PATH", parts[0])
+	// A quoted value cannot be split on spaces, so the shell reports a missing binary instead.
+	if !strings.ContainsAny(editor, `"'\`) {
+		if _, err := exec.LookPath(parts[0]); err != nil {
+			return "", fmt.Errorf("editor %q not found in PATH", parts[0])
+		}
 	}
 	return editor, nil
 }
 
-// editorExecCommand builds the exec.Cmd for a configured editor value that
-// may include arguments (e.g. "code --wait"), appending trailingArgs (the
-// temp file) after the editor's own arguments.
+// editorExecCommand runs the editor value through sh like git does, so quotes
+// and arguments in it work. trailingArgs go in as "$@" and are never parsed.
 func editorExecCommand(editor string, trailingArgs ...string) *exec.Cmd {
-	parts := strings.Fields(editor)
-	if len(parts) == 0 {
-		return exec.Command(editor, trailingArgs...) //nolint:gosec // editor is user-configured
-	}
-	args := make([]string, 0, len(parts)-1+len(trailingArgs))
-	args = append(args, parts[1:]...)
-	args = append(args, trailingArgs...)
-	return exec.Command(parts[0], args...) //nolint:gosec // editor is user-configured
+	args := append([]string{"-c", editor + ` "$@"`, editor}, trailingArgs...)
+	return exec.Command("sh", args...) //nolint:gosec // editor is user-configured
 }
 
 func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
