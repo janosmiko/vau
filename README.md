@@ -1,5 +1,7 @@
 # :lock: vau - Vault Navigator
 
+[![Release](https://img.shields.io/github/v/release/janosmiko/vau)](https://github.com/janosmiko/vau/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/vau/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/vau/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/janosmiko/vau?style=flat)](https://github.com/janosmiko/vau) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_vau&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_vau) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_vau&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_vau) [![codecov](https://codecov.io/gh/janosmiko/vau/graph/badge.svg)](https://codecov.io/gh/janosmiko/vau) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/vau/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/vau)
+
 A yazi-inspired terminal UI for browsing and editing HashiCorp Vault KV secrets.
 
 **vau** is a lightning-fast, keyboard-driven, yazi-inspired navigator for your Vault secrets. Supports both **KV v1** and **KV v2** engines with automatic version detection.

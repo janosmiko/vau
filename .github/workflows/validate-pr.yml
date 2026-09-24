@@ -1,0 +1,40 @@
+# A non-conventional PR title makes release-please skip the release, since
+# squash-merge uses the title as the commit subject.
+name: Validate PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  reject-main-source-branch:
+    name: Reject PRs from fork's main/master
+    if: github.head_ref == 'main' || github.head_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail with guidance
+        run: |
+          echo "::error title=PR source branch not allowed::Pull requests must not be opened from the 'main' or 'master' branch of your fork."
+          echo ""
+          echo "To fix this:"
+          echo "  1. On your fork, sync main and create a feature branch:"
+          echo "       git checkout main && git pull upstream main"
+          echo "       git checkout -b feature/my-change"
+          echo "  2. Move your commits to the new branch and push it:"
+          echo "       git push -u origin feature/my-change"
+          echo "  3. Close this PR and open a new one from that branch."
+          exit 1
+
+  lint-pr-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check PR title against Conventional Commits
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
