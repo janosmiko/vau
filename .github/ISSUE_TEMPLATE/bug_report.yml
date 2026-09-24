@@ -1,0 +1,127 @@
+name: Bug report
+description: Report a bug or unexpected behavior in vau
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill out the
+        details below so we can reproduce and fix the issue quickly.
+
+        Before filing, please search existing issues to avoid duplicates and
+        make sure no secrets, tokens, or Vault data appear in your report.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal reproduction steps.
+      placeholder: |
+        1. Start vau with `VAULT_ADDR=https://vault.example.com vau`
+        2. Navigate to a KV mount and open a secret
+        3. Press `e` to edit
+        4. Observe the error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full error message when available.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: vau version
+      description: Output of `vau --version`, or the release tag / commit SHA if built from source.
+      placeholder: v0.x.y
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_source
+    attributes:
+      label: Installation source
+      options:
+        - Homebrew
+        - Binary release
+        - Docker
+        - go install
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 14.5 / Ubuntu 24.04 / Windows 11 + WSL2 / ...
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal emulator
+      placeholder: Ghostty 1.0 / Kitty / iTerm2 / Alacritty / WezTerm / Terminal.app / ...
+    validations:
+      required: true
+
+  - type: input
+    id: vault_version
+    attributes:
+      label: Vault server version
+      description: Output of `vault status` (Version field), or your Vault provider (HCP Vault, self-hosted, etc.).
+      placeholder: 1.17.2 / HCP Vault / OpenBao ...
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Paste the relevant portion of `~/.config/vau/config.yaml`. Redact any secrets.
+      render: yaml
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Paste error messages or panics. Redact any tokens, secret values, or
+        paths you consider sensitive.
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, screen recordings, or anything else that helps us understand the issue.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I redacted any secrets, tokens, or personal data from this report.
+          required: true
