@@ -87,7 +87,7 @@ func (c *Client) getMountVersion(mount string) int {
 		c.mountVersions[mount] = 2
 		return 2
 	}
-	if options, ok := secret.Data["options"].(map[string]interface{}); ok {
+	if options, ok := secret.Data["options"].(map[string]any); ok {
 		if version, ok := options["version"].(string); ok && version == "1" {
 			c.mountVersions[mount] = 1
 			return 1
@@ -141,7 +141,7 @@ func (c *Client) ListWithMount(mount, path string) ([]model.Entry, error) {
 		return nil, nil
 	}
 
-	keysList, ok := keysRaw.([]interface{})
+	keysList, ok := keysRaw.([]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected keys type at %s", path)
 	}
@@ -187,7 +187,7 @@ func (c *Client) List(path string) ([]model.Entry, error) {
 		return nil, nil
 	}
 
-	keysList, ok := keysRaw.([]interface{})
+	keysList, ok := keysRaw.([]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected keys type at %s", path)
 	}
@@ -232,7 +232,7 @@ func (c *Client) Read(path string) (*model.Secret, error) {
 		return nil, fmt.Errorf("secret not found at %s", path)
 	}
 
-	var dataMap map[string]interface{}
+	var dataMap map[string]any
 	if isV1 {
 		// KV v1: data is directly in secret.Data
 		dataMap = secret.Data
@@ -242,7 +242,7 @@ func (c *Client) Read(path string) (*model.Secret, error) {
 		if !ok || dataRaw == nil {
 			return &model.Secret{Path: path, Data: make(map[string]string), Keys: nil}, nil
 		}
-		dataMap, ok = dataRaw.(map[string]interface{})
+		dataMap, ok = dataRaw.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("unexpected data type at %s", path)
 		}
@@ -268,19 +268,19 @@ func (c *Client) Write(path string, data map[string]string) error {
 	isV1 := c.getMountVersion(c.mount) == 1
 
 	var apiPath string
-	var payload map[string]interface{}
+	var payload map[string]any
 
 	if isV1 {
 		apiPath = fmt.Sprintf("%s/%s", c.mount, path)
 		// KV v1: write data directly
-		payload = make(map[string]interface{}, len(data))
+		payload = make(map[string]any, len(data))
 		for k, v := range data {
 			payload[k] = v
 		}
 	} else {
 		apiPath = fmt.Sprintf("%s/data/%s", c.mount, path)
 		// KV v2: wrap in {"data": ...}
-		payload = map[string]interface{}{
+		payload = map[string]any{
 			"data": data,
 		}
 	}
@@ -363,14 +363,14 @@ func (c *Client) ReadVersionMetadata(path string) ([]model.SecretVersion, error)
 		return nil, fmt.Errorf("no versions data at %s", path)
 	}
 
-	versionsMap, ok := versionsRaw.(map[string]interface{})
+	versionsMap, ok := versionsRaw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected versions type at %s", path)
 	}
 
 	var versions []model.SecretVersion
 	for vNum, vData := range versionsMap {
-		vMap, ok := vData.(map[string]interface{})
+		vMap, ok := vData.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -420,7 +420,7 @@ func (c *Client) ReadVersion(path string, version int) (*model.Secret, error) {
 		return &model.Secret{Path: path, Data: make(map[string]string), Keys: nil}, nil
 	}
 
-	dataMap, ok := dataRaw.(map[string]interface{})
+	dataMap, ok := dataRaw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected data type at %s v%d", path, version)
 	}
@@ -442,11 +442,11 @@ func (c *Client) DestroyVersions(path string, versions []int) error {
 		return ErrKV1NotSupported
 	}
 	apiPath := fmt.Sprintf("%s/destroy/%s", c.mount, path)
-	versionStrs := make([]interface{}, len(versions))
+	versionStrs := make([]any, len(versions))
 	for i, v := range versions {
 		versionStrs[i] = v
 	}
-	_, err := c.raw.Logical().Write(apiPath, map[string]interface{}{
+	_, err := c.raw.Logical().Write(apiPath, map[string]any{
 		"versions": versionStrs,
 	})
 	if err != nil {

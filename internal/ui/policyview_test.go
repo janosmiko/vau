@@ -52,7 +52,7 @@ func TestRenderPolicyViewOverlay(t *testing.T) {
 }
 
 func TestRenderPolicyViewOverlayScrolling(t *testing.T) {
-	var lines []string
+	lines := make([]string, 0, 50)
 	for i := range 50 {
 		lines = append(lines, "line "+strings.Repeat("x", i))
 	}
@@ -66,7 +66,7 @@ func TestRenderHCLPreviewEmpty(t *testing.T) {
 }
 
 func TestRenderHCLPreviewLimitsHeight(t *testing.T) {
-	var lines []string
+	lines := make([]string, 0, 20)
 	for range 20 {
 		lines = append(lines, "line content")
 	}

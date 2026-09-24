@@ -27,10 +27,7 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 	maxBarW := width - 2 // leading space + margin
 
 	// Truncate long paths to keep tabs compact
-	maxPathLen := maxBarW / len(tabLabels)
-	if maxPathLen < 8 {
-		maxPathLen = 8
-	}
+	maxPathLen := max(maxBarW/len(tabLabels), 8)
 
 	// Build rendered tabs and measure widths
 	type renderedTab struct {
@@ -151,10 +148,7 @@ func RenderExplorer(
 	versionRendered := StatusStyle.Render(versionTag)
 	breadcrumbWidth := lipgloss.Width(breadcrumbRendered)
 	versionWidth := lipgloss.Width(versionRendered)
-	padding := width - breadcrumbWidth - versionWidth
-	if padding < 1 {
-		padding = 1
-	}
+	padding := max(width-breadcrumbWidth-versionWidth, 1)
 	breadcrumbLine := breadcrumbRendered + strings.Repeat(" ", padding) + versionRendered
 
 	// Build header: breadcrumb first, tab bar below (only when 2+ tabs)
@@ -209,10 +203,7 @@ func renderEntryList(entries []model.Entry, selectedIdx int, selected map[int]bo
 	if selectedIdx >= height {
 		start = selectedIdx - height + 1
 	}
-	end := start + height
-	if end > len(entries) {
-		end = len(entries)
-	}
+	end := min(start+height, len(entries))
 
 	for i := start; i < end; i++ {
 		e := entries[i]
@@ -221,10 +212,7 @@ func renderEntryList(entries []model.Entry, selectedIdx int, selected map[int]bo
 		if selected != nil && selected[i] {
 			marker = "● "
 		}
-		maxW := width - 2 - len(marker)
-		if maxW < 4 {
-			maxW = 4
-		}
+		maxW := max(width-2-len(marker), 4)
 		if len(name) > maxW {
 			name = name[:maxW-3] + "..."
 		}
@@ -298,8 +286,8 @@ func renderPreview(entries []model.Entry, secret *model.Secret, previewMode mode
 	if limit > len(entries) {
 		limit = len(entries)
 	}
-	for i := 0; i < limit; i++ {
-		e := entries[i]
+	for i := range limit {
+		e := entries[i] //nolint:gosec // limit is clamped to len(entries) above
 		name := e.Name
 		if len(name) > width-1 {
 			name = name[:width-4] + "..."
@@ -322,20 +310,14 @@ func renderSecretPreview(secret *model.Secret, previewMode model.PreviewMode, wi
 		return renderSecretJSON(secret, height)
 	}
 
-	sepW := width - 2
-	if sepW < 4 {
-		sepW = 4
-	}
+	sepW := max(width-2, 4)
 
 	var lines []string
 	lines = append(lines, TableHeaderStyle.Render("Key")+"  "+TableHeaderStyle.Render("Value"))
 	lines = append(lines, strings.Repeat("─", sepW))
 
-	limit := height - 2
-	if limit > len(secret.Keys) {
-		limit = len(secret.Keys)
-	}
-	for i := 0; i < limit; i++ {
+	limit := min(height-2, len(secret.Keys))
+	for i := range limit {
 		k := secret.Keys[i]
 		keyStr := TableKeyStyle.Render(k)
 		var valStr string
@@ -352,13 +334,10 @@ func renderSecretPreview(secret *model.Secret, previewMode model.PreviewMode, wi
 }
 
 func renderSecretJSON(secret *model.Secret, height int) string {
-	var lines []string
+	limit := min(height-2, len(secret.Keys))
+	lines := make([]string, 0, 1+limit+1)
 	lines = append(lines, HelpDescStyle.Render("{"))
-	limit := height - 2
-	if limit > len(secret.Keys) {
-		limit = len(secret.Keys)
-	}
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		k := secret.Keys[i]
 		v := secret.Data[k]
 		comma := ","

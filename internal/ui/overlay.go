@@ -73,13 +73,7 @@ func PlaceOverlay(bg string, overlay string, bgWidth, bgHeight int) string {
 
 // RenderInputOverlay renders a centered input prompt overlay.
 func RenderInputOverlay(label string, inputView string, width int) string {
-	boxWidth := width / 2
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/2, 40), width-4)
 
 	content := InputLabelStyle.Render(label) + "\n\n" + inputView
 
@@ -89,13 +83,7 @@ func RenderInputOverlay(label string, inputView string, width int) string {
 // RenderConfirmOverlay renders a centered confirmation dialog overlay.
 // It displays the message and a text input where the user must type "DELETE" to confirm.
 func RenderConfirmOverlay(message string, inputView string, width int) string {
-	boxWidth := width / 2
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/2, 40), width-4)
 
 	content := message + "\n\n" +
 		HelpDescStyle.Render("Type DELETE to confirm:") + "\n\n" +
@@ -108,37 +96,20 @@ func RenderConfirmOverlay(message string, inputView string, width int) string {
 
 // RenderJumpPathOverlay renders a centered jump-to-path prompt with completions.
 func RenderJumpPathOverlay(inputView string, completions []string, selectedIdx int, width, height int) string {
-	boxWidth := width / 2
-	if boxWidth < 50 {
-		boxWidth = 50
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/2, 50), width-4)
 
 	// Max width for entries (border 2 + padding 4 + prefix 2)
-	maxEntryW := boxWidth - 8
-	if maxEntryW < 10 {
-		maxEntryW = 10
-	}
+	maxEntryW := max(boxWidth-8, 10)
 
-	content := InputLabelStyle.Render("Jump to path:") + "\n\n" + inputView
+	var content strings.Builder
+	content.WriteString(InputLabelStyle.Render("Jump to path:") + "\n\n" + inputView)
 
 	// Show completions if available
 	if len(completions) > 0 {
-		content += "\n\n"
+		content.WriteString("\n\n")
 		// Cap visible completions to fit terminal (label + input + gaps + help + border/padding ~ 8 lines)
-		maxShow := height - 8
-		if maxShow > 10 {
-			maxShow = 10
-		}
-		if maxShow < 1 {
-			maxShow = 1
-		}
-		if len(completions) < maxShow {
-			maxShow = len(completions)
-		}
-		for i := 0; i < maxShow; i++ {
+		maxShow := min(max(min(height-8, 10), 1), len(completions))
+		for i := range maxShow {
 			entry := completions[i]
 			// Truncate long paths
 			displayEntry := entry
@@ -146,32 +117,26 @@ func RenderJumpPathOverlay(inputView string, completions []string, selectedIdx i
 				displayEntry = displayEntry[:maxEntryW-3] + "..."
 			}
 			if i == selectedIdx {
-				content += SelectedStyle.Render(" "+displayEntry+" ") + "\n"
+				content.WriteString(SelectedStyle.Render(" "+displayEntry+" ") + "\n")
 			} else {
 				if strings.HasSuffix(entry, "/") {
-					content += DirStyle.Render("  "+displayEntry) + "\n"
+					content.WriteString(DirStyle.Render("  "+displayEntry) + "\n")
 				} else {
-					content += FileStyle.Render("  "+displayEntry) + "\n"
+					content.WriteString(FileStyle.Render("  "+displayEntry) + "\n")
 				}
 			}
 		}
 		if len(completions) > maxShow {
-			content += HelpDescStyle.Render(fmt.Sprintf("  ... and %d more", len(completions)-maxShow))
+			content.WriteString(HelpDescStyle.Render(fmt.Sprintf("  ... and %d more", len(completions)-maxShow)))
 		}
 	}
 
-	return overlayBoxStyle.Width(boxWidth).Render(content)
+	return overlayBoxStyle.Width(boxWidth).Render(content.String())
 }
 
 // RenderSearchOverlay renders a centered search/filter overlay.
 func RenderSearchOverlay(label string, inputView string, width int) string {
-	boxWidth := width / 2
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/2, 40), width-4)
 
 	content := InputLabelStyle.Render(label) + "\n\n" + inputView
 
@@ -180,26 +145,18 @@ func RenderSearchOverlay(label string, inputView string, width int) string {
 
 // RenderBookmarkOverlay renders a centered bookmark overlay with filter and cursor navigation.
 func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, searching bool, cursor int, width, height int) string {
-	boxWidth := width / 3
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/3, 40), width-4)
 
-	maxEntryW := boxWidth - 8
-	if maxEntryW < 10 {
-		maxEntryW = 10
-	}
+	maxEntryW := max(boxWidth-8, 10)
 
-	content := InputLabelStyle.Render("Marks")
+	var content strings.Builder
+	content.WriteString(InputLabelStyle.Render("Marks"))
 
 	// Show filter input only when searching or filter is active
 	if searching {
-		content += "\n\n" + HelpDescStyle.Render("/ ") + HelpKeyStyle.Render(filter+"_")
+		content.WriteString("\n\n" + HelpDescStyle.Render("/ ") + HelpKeyStyle.Render(filter+"_"))
 	} else if filter != "" {
-		content += "\n\n" + HelpDescStyle.Render("/ ") + HelpKeyStyle.Render(filter)
+		content.WriteString("\n\n" + HelpDescStyle.Render("/ ") + HelpKeyStyle.Render(filter))
 	}
 
 	// Filter bookmarks
@@ -216,29 +173,20 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 	}
 
 	if len(allBookmarks) == 0 {
-		content += "\n\n" + HelpDescStyle.Render("  No bookmarks yet")
-		content += "\n" + HelpDescStyle.Render("  Press m + [a-z,0-9] to set a mark")
+		content.WriteString("\n\n" + HelpDescStyle.Render("  No bookmarks yet"))
+		content.WriteString("\n" + HelpDescStyle.Render("  Press m + [a-z,0-9] to set a mark"))
 	} else if len(filtered) == 0 {
-		content += "\n\n" + HelpDescStyle.Render("  No matching bookmarks")
+		content.WriteString("\n\n" + HelpDescStyle.Render("  No matching bookmarks"))
 	} else {
-		content += "\n"
-		maxShow := height - 10
-		if maxShow < 3 {
-			maxShow = 3
-		}
-		if maxShow > len(filtered) {
-			maxShow = len(filtered)
-		}
+		content.WriteString("\n")
+		maxShow := min(max(height-10, 3), len(filtered))
 
 		// Scroll window around cursor
 		start := 0
 		if cursor >= maxShow {
 			start = cursor - maxShow + 1
 		}
-		end := start + maxShow
-		if end > len(filtered) {
-			end = len(filtered)
-		}
+		end := min(start+maxShow, len(filtered))
 
 		for i := start; i < end; i++ {
 			bm := filtered[i]
@@ -255,7 +203,7 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 				} else {
 					prefix = "  "
 				}
-				content += "\n" + SelectedStyle.Render(" "+prefix+name+" ")
+				content.WriteString("\n" + SelectedStyle.Render(" "+prefix+name+" "))
 			} else {
 				// Non-selected: slot key in bold green
 				var prefix string
@@ -264,56 +212,39 @@ func RenderBookmarkOverlay(allBookmarks []config.Bookmark, filter string, search
 				} else {
 					prefix = "  "
 				}
-				content += "\n " + prefix + HelpDescStyle.Render(name)
+				content.WriteString("\n " + prefix + HelpDescStyle.Render(name))
 			}
 		}
 		if len(filtered) > maxShow {
-			content += "\n" + HelpDescStyle.Render(fmt.Sprintf("  ... %d total", len(filtered)))
+			content.WriteString("\n" + HelpDescStyle.Render(fmt.Sprintf("  ... %d total", len(filtered))))
 		}
 	}
 
-	return overlayBoxStyle.Width(boxWidth).Render(content)
+	return overlayBoxStyle.Width(boxWidth).Render(content.String())
 }
 
 // RenderThemePickerOverlay renders a centered colorscheme picker overlay
 // with entries grouped by dark/light themes.
 func RenderThemePickerOverlay(entries []ThemeEntry, cursor int, activeTheme string, width, height int) string {
-	boxWidth := width / 2
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	if boxWidth > width-4 {
-		boxWidth = width - 4
-	}
+	boxWidth := min(max(width/2, 40), width-4)
 
-	maxEntryW := boxWidth - 8
-	if maxEntryW < 10 {
-		maxEntryW = 10
-	}
+	maxEntryW := max(boxWidth-8, 10)
 
-	content := InputLabelStyle.Render("Colorscheme")
+	var content strings.Builder
+	content.WriteString(InputLabelStyle.Render("Colorscheme"))
 
 	if len(entries) == 0 {
-		content += "\n\n" + HelpDescStyle.Render("  No themes available")
+		content.WriteString("\n\n" + HelpDescStyle.Render("  No themes available"))
 	} else {
-		content += "\n"
-		maxShow := height - 10
-		if maxShow < 3 {
-			maxShow = 3
-		}
-		if maxShow > len(entries) {
-			maxShow = len(entries)
-		}
+		content.WriteString("\n")
+		maxShow := min(max(height-10, 3), len(entries))
 
 		// Scroll window around cursor
 		start := 0
 		if cursor >= maxShow {
 			start = cursor - maxShow + 1
 		}
-		end := start + maxShow
-		if end > len(entries) {
-			end = len(entries)
-		}
+		end := min(start+maxShow, len(entries))
 
 		for i := start; i < end; i++ {
 			entry := entries[i]
@@ -324,7 +255,7 @@ func RenderThemePickerOverlay(entries []ThemeEntry, cursor int, activeTheme stri
 					Foreground(colorPrimary).
 					Bold(true).
 					Render(entry.Name)
-				content += "\n\n " + header
+				content.WriteString("\n\n " + header)
 				continue
 			}
 
@@ -339,14 +270,14 @@ func RenderThemePickerOverlay(entries []ThemeEntry, cursor int, activeTheme stri
 			}
 
 			if i == cursor {
-				content += "\n" + SelectedStyle.Render(" "+marker+name+" ")
+				content.WriteString("\n" + SelectedStyle.Render(" "+marker+name+" "))
 			} else {
-				content += "\n" + HelpDescStyle.Render(" "+marker) + FileStyle.Render(name)
+				content.WriteString("\n" + HelpDescStyle.Render(" "+marker) + FileStyle.Render(name))
 			}
 		}
 	}
 
-	return overlayBoxStyle.Width(boxWidth).Render(content)
+	return overlayBoxStyle.Width(boxWidth).Render(content.String())
 }
 
 // takeVisualWidth returns the prefix of s up to n visual columns,

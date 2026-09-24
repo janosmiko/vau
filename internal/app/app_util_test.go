@@ -2985,7 +2985,7 @@ func TestHandleThemePickerKey_Esc(t *testing.T) {
 	m.themeCursor = 0
 	m.activeColorscheme = "dracula"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEsc})
 	assert.Equal(t, model.ModeExplorer, result.(*Model).mode)
 }
 
@@ -2996,7 +2996,7 @@ func TestHandleThemePickerKey_Q(t *testing.T) {
 	m.themeCursor = 0
 	m.activeColorscheme = "dracula"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	assert.Equal(t, model.ModeExplorer, result.(*Model).mode)
 }
 
@@ -3010,7 +3010,7 @@ func TestHandleThemePickerKey_Enter(t *testing.T) {
 	m.themeCursor = 1
 	m.activeColorscheme = "monokai"
 
-	result, _ := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEnter})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyEnter})
 	resultModel := result.(*Model)
 
 	assert.Equal(t, model.ModeExplorer, resultModel.mode)
@@ -3052,9 +3052,8 @@ func TestHandleThemePickerKey_UnknownKey(t *testing.T) {
 	m.themeEntries = []ui.ThemeEntry{{Name: "dracula", IsHeader: false}}
 	m.themeCursor = 0
 
-	result, cmd := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	result := m.handleThemePickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	assert.Equal(t, m, result)
-	assert.Nil(t, cmd)
 }
 
 // ---------------------------------------------------------------------------

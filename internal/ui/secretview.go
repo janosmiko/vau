@@ -51,14 +51,8 @@ func RenderSecretOverlay(
 	helpH := 1     // help line
 	gapH := 2      // blank line above inner panel + blank line below
 
-	panelContentH := boxH - outerPadH - innerPadH - titleH - helpH - gapH
-	if panelContentH < 3 {
-		panelContentH = 3
-	}
-	panelContentW := boxW - outerPadW - innerPadW
-	if panelContentW < 20 {
-		panelContentW = 20
-	}
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-helpH-gapH, 3)
+	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
 	// Title
@@ -110,10 +104,7 @@ func renderSecretTable(
 		keyColW = width / 3
 	}
 
-	valColW := width - keyColW - 10
-	if valColW < 8 {
-		valColW = 8
-	}
+	valColW := max(width-keyColW-10, 8)
 
 	var lines []string
 
@@ -124,18 +115,12 @@ func renderSecretTable(
 	lines = append(lines, headerLine)
 	lines = append(lines, separator)
 
-	tableHeight := height - 2
-	if tableHeight < 1 {
-		tableHeight = 1
-	}
+	tableHeight := max(height-2, 1)
 	start := 0
 	if selectedIdx >= tableHeight {
 		start = selectedIdx - tableHeight + 1
 	}
-	end := start + tableHeight
-	if end > len(secret.Keys) {
-		end = len(secret.Keys)
-	}
+	end := min(start+tableHeight, len(secret.Keys))
 
 	for i := start; i < end; i++ {
 		k := secret.Keys[i]
@@ -186,13 +171,10 @@ func renderSecretTable(
 }
 
 func renderSecretPopupJSON(secret *model.Secret, height int) string {
-	var lines []string
+	limit := min(height-2, len(secret.Keys))
+	lines := make([]string, 0, 1+limit+1)
 	lines = append(lines, HelpDescStyle.Render("{"))
-	limit := height - 2
-	if limit > len(secret.Keys) {
-		limit = len(secret.Keys)
-	}
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		k := secret.Keys[i]
 		v := secret.Data[k]
 		comma := ","
@@ -291,18 +273,12 @@ func RenderVersionHistoryOverlay(versions []model.SecretVersion, selectedIdx int
 	lines = append(lines, headerLine)
 	lines = append(lines, "  "+strings.Repeat("─", innerW))
 
-	tableH := boxH - 8
-	if tableH < 1 {
-		tableH = 1
-	}
+	tableH := max(boxH-8, 1)
 	start := 0
 	if selectedIdx >= tableH {
 		start = selectedIdx - tableH + 1
 	}
-	end := start + tableH
-	if end > len(versions) {
-		end = len(versions)
-	}
+	end := min(start+tableH, len(versions))
 
 	for i := start; i < end; i++ {
 		v := versions[i]
