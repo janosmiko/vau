@@ -384,14 +384,15 @@ func (m *Model) handleRoleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return result, nil
 	}
 
+	if matchKey(key, m.keys.Quit) {
+		return m, tea.Quit
+	}
+
 	if cmd, handled := m.handleRoleListNavKey(key); handled {
 		return m, cmd
 	}
 
 	switch {
-	case matchKey(key, m.keys.Quit):
-		return m, tea.Quit
-
 	case matchKey(key, m.keys.Right) || matchKey(key, m.keys.Open):
 		if len(m.roles) > 0 && m.roleCursor < len(m.roles) {
 			return m, m.loadRole(m.roleAuthPath, m.roles[m.roleCursor].Name)

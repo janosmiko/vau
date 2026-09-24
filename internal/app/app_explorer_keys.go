@@ -172,7 +172,13 @@ func (m *Model) handleExplorerNavKey(key string) (tea.Model, tea.Cmd, bool) {
 			return m, m.loadPreview(), true
 		}
 		return m, nil, true
+	}
+	return m, nil, false
+}
 
+// handleExplorerPageKey handles half-page and full-page scroll keys in the explorer.
+func (m *Model) handleExplorerPageKey(key string) (tea.Model, tea.Cmd, bool) {
+	switch {
 	case matchKey(key, m.keys.HalfDown):
 		// Half-page scroll down
 		vis := m.visibleEntries()
@@ -226,60 +232,9 @@ func (m *Model) handleExplorerNavKey(key string) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleExplorerClipboardKey handles yank/paste/cut/delete keys in the explorer.
+// handleExplorerClipboardKey handles delete/cut/undo/redo keys in the explorer.
 func (m *Model) handleExplorerClipboardKey(key string) (tea.Model, tea.Cmd, bool) {
 	switch {
-	case matchKey(key, m.keys.Yank):
-		if len(m.selected) > 0 {
-			entries := m.selectedEntries()
-			m.status = fmt.Sprintf("Yanking %d items...", len(entries))
-			m.yankMount = m.client.Mount()
-			m.selected = make(map[int]bool)
-			return m, m.bulkYankSecrets(entries, false), true
-		}
-		entry := m.selectedEntry()
-		if entry != nil {
-			if entry.IsDir {
-				path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
-				m.yankIsCut = false
-				m.yankIsDir = true
-				m.yankPaths = []string{path}
-				m.yankMount = m.client.Mount()
-				m.yankedSecrets = nil
-				m.status = "Yanked (directory): " + entry.Name
-				return m, nil, true
-			}
-			path := m.currentPath() + entry.Name
-			m.yankIsCut = false
-			m.yankIsDir = false
-			m.yankPaths = []string{path}
-			m.yankMount = m.client.Mount()
-			m.status = "Yanking " + entry.Name + "..."
-			return m, m.yankSecret(path), true
-		}
-		return m, nil, true
-
-	case matchKey(key, m.keys.Paste):
-		if m.yankIsDir {
-			if m.yankMount != "" && m.yankMount != m.client.Mount() {
-				m.errMsg = "Cannot paste across different mounts"
-				return m, nil, true
-			}
-			cmd := m.pasteSecrets()
-			if m.yankIsCut {
-				m.yankIsCut = false
-				m.yankIsDir = false
-			}
-			return m, cmd, true
-		}
-		if len(m.yankedSecrets) > 0 {
-			cmd := m.pasteSecrets()
-			m.yankIsCut = false
-			return m, cmd, true
-		}
-		m.errMsg = "Nothing yanked"
-		return m, nil, true
-
 	case matchKey(key, m.keys.Delete):
 		if len(m.selected) > 0 {
 			// Bulk delete
@@ -401,6 +356,21 @@ func (m *Model) handleExplorerModeKey(key string) (tea.Model, tea.Cmd, bool) {
 		m.loadJumpCompletions()
 		return m, textinput.Blink, true
 
+	case matchKey(key, m.keys.Edit):
+		// Edit secret in external editor from explorer
+		entry := m.selectedEntry()
+		if entry != nil && !entry.IsDir {
+			path := m.currentPath() + entry.Name
+			return m, func() tea.Msg {
+				secret, err := m.client.Read(path)
+				if err != nil {
+					return errorMsg(err.Error())
+				}
+				return secretResultMsg{path: path, secret: secret, openEditor: true}
+			}, true
+		}
+		return m, nil, true
+
 	case matchKey(key, m.keys.BookmarkSave):
 		m.markPending = true
 		m.status = "Set mark: [a-z, 0-9]"
@@ -458,6 +428,57 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 		}
 		return m, nil, true
 
+	case matchKey(key, m.keys.Yank):
+		if len(m.selected) > 0 {
+			entries := m.selectedEntries()
+			m.status = fmt.Sprintf("Yanking %d items...", len(entries))
+			m.yankMount = m.client.Mount()
+			m.selected = make(map[int]bool)
+			return m, m.bulkYankSecrets(entries, false), true
+		}
+		entry := m.selectedEntry()
+		if entry != nil {
+			if entry.IsDir {
+				path := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
+				m.yankIsCut = false
+				m.yankIsDir = true
+				m.yankPaths = []string{path}
+				m.yankMount = m.client.Mount()
+				m.yankedSecrets = nil
+				m.status = "Yanked (directory): " + entry.Name
+				return m, nil, true
+			}
+			path := m.currentPath() + entry.Name
+			m.yankIsCut = false
+			m.yankIsDir = false
+			m.yankPaths = []string{path}
+			m.yankMount = m.client.Mount()
+			m.status = "Yanking " + entry.Name + "..."
+			return m, m.yankSecret(path), true
+		}
+		return m, nil, true
+
+	case matchKey(key, m.keys.Paste):
+		if m.yankIsDir {
+			if m.yankMount != "" && m.yankMount != m.client.Mount() {
+				m.errMsg = "Cannot paste across different mounts"
+				return m, nil, true
+			}
+			cmd := m.pasteSecrets()
+			if m.yankIsCut {
+				m.yankIsCut = false
+				m.yankIsDir = false
+			}
+			return m, cmd, true
+		}
+		if len(m.yankedSecrets) > 0 {
+			cmd := m.pasteSecrets()
+			m.yankIsCut = false
+			return m, cmd, true
+		}
+		m.errMsg = "Nothing yanked"
+		return m, nil, true
+
 	case matchKey(key, m.keys.ToggleValues):
 		// Toggle secret value visibility in preview
 		if m.previewSecret != nil {
@@ -488,21 +509,6 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 			m.copyFormatPending = true
 			m.status = "Copy as: (j)son  (y)aml  (d)otenv"
 			return m, nil, true
-		}
-		return m, nil, true
-
-	case matchKey(key, m.keys.Edit):
-		// Edit secret in external editor from explorer
-		entry := m.selectedEntry()
-		if entry != nil && !entry.IsDir {
-			path := m.currentPath() + entry.Name
-			return m, func() tea.Msg {
-				secret, err := m.client.Read(path)
-				if err != nil {
-					return errorMsg(err.Error())
-				}
-				return secretResultMsg{path: path, secret: secret, openEditor: true}
-			}, true
 		}
 		return m, nil, true
 	}
@@ -537,6 +543,7 @@ func (m *Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.handleExplorerTabKey,
 		m.handleExplorerNavKey,
 		m.handleExplorerMiscKey,
+		m.handleExplorerPageKey,
 		m.handleExplorerClipboardKey,
 		m.handleExplorerModeKey,
 	} {
