@@ -115,14 +115,15 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 }
 
 func (m *Model) renameEntry(newName string) tea.Cmd {
+	entry := m.selectedEntry()
+	base := m.currentPath()
 	return func() tea.Msg {
-		entry := m.selectedEntry()
 		if entry == nil {
 			return errorMsg("no entry selected")
 		}
 		if entry.IsDir {
-			src := m.currentPath() + strings.TrimSuffix(entry.Name, "/")
-			dst := m.currentPath() + strings.TrimSuffix(newName, "/")
+			src := base + strings.TrimSuffix(entry.Name, "/")
+			dst := base + strings.TrimSuffix(newName, "/")
 			count, err := m.client.MoveRecursive(src, dst)
 			if err != nil {
 				return errorMsg(err.Error())
@@ -137,8 +138,8 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 				},
 			}
 		}
-		src := m.currentPath() + entry.Name
-		dst := m.currentPath() + newName
+		src := base + entry.Name
+		dst := base + newName
 		if err := m.client.Move(src, dst); err != nil {
 			return errorMsg(err.Error())
 		}
