@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/vau/internal/model"
@@ -197,7 +196,7 @@ func (m *Model) openEditorWithContent(content, extension string, callback func(s
 	}
 	tmpFile.Close()
 
-	c := exec.Command(editor, tmpFile.Name()) //nolint:gosec // editor is user-configured
+	c := editorExecCommand(editor, tmpFile.Name())
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		defer os.Remove(tmpFile.Name())
 		if err != nil {

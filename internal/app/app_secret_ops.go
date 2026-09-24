@@ -408,10 +408,28 @@ func (m *Model) editorCommand() (string, error) {
 	} else if e := os.Getenv("VISUAL"); e != "" {
 		editor = e
 	}
-	if _, err := exec.LookPath(editor); err != nil {
-		return "", fmt.Errorf("editor %q not found in PATH", editor)
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("editor is empty")
+	}
+	if _, err := exec.LookPath(parts[0]); err != nil {
+		return "", fmt.Errorf("editor %q not found in PATH", parts[0])
 	}
 	return editor, nil
+}
+
+// editorExecCommand builds the exec.Cmd for a configured editor value that
+// may include arguments (e.g. "code --wait"), appending trailingArgs (the
+// temp file) after the editor's own arguments.
+func editorExecCommand(editor string, trailingArgs ...string) *exec.Cmd {
+	parts := strings.Fields(editor)
+	if len(parts) == 0 {
+		return exec.Command(editor, trailingArgs...) //nolint:gosec // editor is user-configured
+	}
+	args := make([]string, 0, len(parts)-1+len(trailingArgs))
+	args = append(args, parts[1:]...)
+	args = append(args, trailingArgs...)
+	return exec.Command(parts[0], args...) //nolint:gosec // editor is user-configured
 }
 
 func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
@@ -438,7 +456,7 @@ func (m *Model) openEditorForNewSecret(path string) tea.Cmd {
 		return func() tea.Msg { return errorMsg(err.Error()) }
 	}
 
-	c := exec.Command(editor, tmpFile.Name())
+	c := editorExecCommand(editor, tmpFile.Name())
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		defer os.Remove(tmpFile.Name())
 		if err != nil {
@@ -541,7 +559,7 @@ func (m *Model) editSecretInEditor() tea.Cmd {
 		return func() tea.Msg { return errorMsg(err.Error()) }
 	}
 
-	c := exec.Command(editor, tmpFile.Name())
+	c := editorExecCommand(editor, tmpFile.Name())
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		defer os.Remove(tmpFile.Name())
 		if err != nil {
