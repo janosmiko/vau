@@ -479,6 +479,7 @@ func (m *Model) renameKey(oldKey, newKey, val string, snapData map[string]string
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}

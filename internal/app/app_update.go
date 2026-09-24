@@ -272,7 +272,7 @@ func (m *Model) updateYankUndoRedoMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.status = msg.status
 		m.errMsg = ""
 		m.pushUndo(msg.undo)
-		if msg.reloadSecret != nil && m.secret != nil && m.secret.Path == msg.reloadSecret.Path {
+		if msg.reloadSecret != nil && m.onActionMount(msg.undo) && m.secret != nil && m.secret.Path == msg.reloadSecret.Path {
 			m.secret.Data = msg.reloadSecret.Data
 			m.secret.Keys = msg.reloadSecret.Keys
 			if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
@@ -288,7 +288,7 @@ func (m *Model) updateYankUndoRedoMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.status = msg.status
 		m.errMsg = ""
 		m.pushRedo(msg.redo)
-		if msg.reloadSecret != nil && m.secret != nil && m.secret.Path == msg.reloadSecret.Path {
+		if msg.reloadSecret != nil && m.onActionMount(msg.redo) && m.secret != nil && m.secret.Path == msg.reloadSecret.Path {
 			m.secret.Data = msg.reloadSecret.Data
 			m.secret.Keys = msg.reloadSecret.Keys
 			if m.secretCursor >= len(m.secret.Keys) && m.secretCursor > 0 {
@@ -343,6 +343,7 @@ func (m *Model) updateSecretEditMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 						Type:        model.UndoCreateSecret,
 						Description: "create " + path,
 						Path:        path,
+						Mount:       client.Mount(),
 					},
 				}
 			}, true

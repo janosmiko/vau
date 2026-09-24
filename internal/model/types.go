@@ -80,6 +80,7 @@ type UndoAction struct {
 	Data        map[string]string // secret data snapshot (for restore)
 	Keys        []string          // key order snapshot (for restore)
 	OldPath     string            // for rename: the original path before rename
+	Mount       string            // mount the action ran on, empty means the current mount
 }
 
 // SecretVersion holds version metadata for a Vault KV v2 secret.

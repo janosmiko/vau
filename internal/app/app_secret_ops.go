@@ -118,6 +118,7 @@ func (m *Model) deleteEntry(entry model.Entry) tea.Cmd {
 				Path:        path,
 				Data:        data,
 				Keys:        keys,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -145,6 +146,7 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 					Description: fmt.Sprintf("rename dir %s → %s", entry.Name, newName),
 					Path:        dst,
 					OldPath:     src,
+					Mount:       client.Mount(),
 				},
 			}
 		}
@@ -160,6 +162,7 @@ func (m *Model) renameEntry(newName string) tea.Cmd {
 				Description: fmt.Sprintf("rename %s → %s", entry.Name, newName),
 				Path:        dst,
 				OldPath:     src,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -360,6 +363,7 @@ func (m *Model) pasteSecrets() tea.Cmd {
 						OldPath:     yanked.Path,
 						Data:        copyMap(yanked.Data),
 						Keys:        copySlice(yanked.Keys),
+						Mount:       client.Mount(),
 					},
 				}
 			}
@@ -371,6 +375,7 @@ func (m *Model) pasteSecrets() tea.Cmd {
 					Path:        dst,
 					Data:        copyMap(yanked.Data),
 					Keys:        copySlice(yanked.Keys),
+					Mount:       client.Mount(),
 				},
 			}
 		}
@@ -418,6 +423,7 @@ func (m *Model) deleteKey(key string) tea.Cmd {
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -522,6 +528,7 @@ func (m *Model) addKeyValue(key, val string) tea.Cmd {
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -551,6 +558,7 @@ func (m *Model) editValue(key, val string) tea.Cmd {
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -578,6 +586,7 @@ func (m *Model) editValueWithSnapshot(key, val string, snapData map[string]strin
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}
@@ -650,6 +659,7 @@ func (m *Model) saveSecretFromEditor(secretPath string, snapData map[string]stri
 				Path:        secretPath,
 				Data:        snapData,
 				Keys:        snapKeys,
+				Mount:       client.Mount(),
 			},
 		}
 	}

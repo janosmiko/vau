@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/vau/internal/model"
+	"github.com/janosmiko/vau/internal/vault"
 )
 
 // --- Version history ---
@@ -112,8 +113,19 @@ func (m *Model) destroyOldVersions(path string) tea.Cmd {
 
 // --- Undo/redo execution ---
 
+func (m *Model) actionClient(action model.UndoAction) *vault.Client {
+	if action.Mount == "" {
+		return m.client
+	}
+	return m.client.WithMount(action.Mount)
+}
+
+func (m *Model) onActionMount(action model.UndoAction) bool {
+	return action.Mount == "" || action.Mount == m.client.Mount()
+}
+
 func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
-	client := m.client
+	client := m.actionClient(action)
 	return func() tea.Msg {
 		var reverse model.UndoAction
 		var reloadSecret *model.Secret
@@ -210,12 +222,13 @@ func (m *Model) executeUndo(action model.UndoAction) tea.Cmd {
 			return errorMsg("unknown undo action")
 		}
 
+		reverse.Mount = client.Mount()
 		return redoableStatusMsg{status: "Undo: " + action.Description, redo: reverse, reloadSecret: reloadSecret}
 	}
 }
 
 func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
-	client := m.client
+	client := m.actionClient(action)
 	return func() tea.Msg {
 		var reverse model.UndoAction
 		var reloadSecret *model.Secret
@@ -304,6 +317,7 @@ func (m *Model) executeRedo(action model.UndoAction) tea.Cmd {
 			return errorMsg("unknown redo action")
 		}
 
+		reverse.Mount = client.Mount()
 		return undoableStatusMsg{status: "Redo: " + action.Description, undo: reverse, reloadSecret: reloadSecret}
 	}
 }
