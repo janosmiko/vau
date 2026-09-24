@@ -68,29 +68,15 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "D":
-		if len(filtered) > 0 && m.bookmarkCursor < len(filtered) {
-			bm := filtered[m.bookmarkCursor]
-			for i, b := range m.bookmarks {
-				if b.Slot == bm.Slot {
-					m.bookmarks = append(m.bookmarks[:i], m.bookmarks[i+1:]...)
-					break
-				}
-			}
-			_ = config.SaveBookmarks(m.bookmarks)
-			newFiltered := m.filteredBookmarks()
-			if m.bookmarkCursor >= len(newFiltered) && m.bookmarkCursor > 0 {
-				m.bookmarkCursor = len(newFiltered) - 1
-			}
-			if len(m.bookmarks) == 0 {
-				m.mode = model.ModeExplorer
-				m.status = "All marks deleted"
-			}
-		}
+		m.deleteSelectedBookmark(filtered)
 		return m, nil
 
 	case "ctrl+x":
+		if err := config.SaveBookmarks(nil); err != nil {
+			m.errMsg = "Failed to save mark: " + err.Error()
+			return m, nil
+		}
 		m.bookmarks = nil
-		_ = config.SaveBookmarks(m.bookmarks)
 		m.mode = model.ModeExplorer
 		m.status = "All marks deleted"
 		return m, nil
@@ -122,6 +108,41 @@ func (m *Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// deleteSelectedBookmark removes the bookmark under the cursor by slot,
+// persisting the change before applying it to m.bookmarks.
+func (m *Model) deleteSelectedBookmark(filtered []config.Bookmark) {
+	if len(filtered) == 0 || m.bookmarkCursor >= len(filtered) {
+		return
+	}
+	bm := filtered[m.bookmarkCursor]
+	idx := -1
+	for i, b := range m.bookmarks {
+		if b.Slot == bm.Slot {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return
+	}
+	proposed := make([]config.Bookmark, 0, len(m.bookmarks)-1)
+	proposed = append(proposed, m.bookmarks[:idx]...)
+	proposed = append(proposed, m.bookmarks[idx+1:]...)
+	if err := config.SaveBookmarks(proposed); err != nil {
+		m.errMsg = "Failed to save mark: " + err.Error()
+		return
+	}
+	m.bookmarks = proposed
+	newFiltered := m.filteredBookmarks()
+	if m.bookmarkCursor >= len(newFiltered) && m.bookmarkCursor > 0 {
+		m.bookmarkCursor = len(newFiltered) - 1
+	}
+	if len(m.bookmarks) == 0 {
+		m.mode = model.ModeExplorer
+		m.status = "All marks deleted"
+	}
 }
 
 // filteredBookmarks returns bookmarks matching the current filter.
@@ -188,14 +209,17 @@ func (m *Model) handleMarkSave(key string) (tea.Model, tea.Cmd) {
 			// Slot exists with different location — check if this is a confirmed overwrite
 			if m.lastMarkAttempt == slot {
 				// Second press — overwrite
-				m.bookmarks[i].Mount = mount
-				m.bookmarks[i].Path = path
-				m.bookmarks[i].Name = name
-				if err := config.SaveBookmarks(m.bookmarks); err != nil {
+				proposed := make([]config.Bookmark, len(m.bookmarks))
+				copy(proposed, m.bookmarks)
+				proposed[i].Mount = mount
+				proposed[i].Path = path
+				proposed[i].Name = name
+				if err := config.SaveBookmarks(proposed); err != nil {
 					m.errMsg = "Failed to save mark: " + err.Error()
 					m.lastMarkAttempt = ""
 					return m, nil
 				}
+				m.bookmarks = proposed
 				m.status = fmt.Sprintf("Mark '%s' updated: %s", slot, name)
 				m.lastMarkAttempt = ""
 				return m, nil
@@ -209,16 +233,17 @@ func (m *Model) handleMarkSave(key string) (tea.Model, tea.Cmd) {
 
 	// Slot is free — save directly
 	m.lastMarkAttempt = ""
-	m.bookmarks = append(m.bookmarks, config.Bookmark{
+	proposed := append(append([]config.Bookmark{}, m.bookmarks...), config.Bookmark{
 		Name:  name,
 		Mount: mount,
 		Path:  path,
 		Slot:  slot,
 	})
-	if err := config.SaveBookmarks(m.bookmarks); err != nil {
+	if err := config.SaveBookmarks(proposed); err != nil {
 		m.errMsg = "Failed to save mark: " + err.Error()
 		return m, nil
 	}
+	m.bookmarks = proposed
 	m.status = fmt.Sprintf("Mark '%s' set: %s", slot, name)
 	return m, nil
 }
