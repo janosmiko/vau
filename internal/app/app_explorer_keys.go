@@ -270,7 +270,6 @@ func (m *Model) handleExplorerClipboardKey(key string) (tea.Model, tea.Cmd, bool
 		if len(m.selected) > 0 {
 			entries := m.selectedEntries()
 			m.status = fmt.Sprintf("Cutting %d items...", len(entries))
-			m.yankMount = m.client.Mount()
 			m.selected = make(map[int]bool)
 			return m, m.bulkYankSecrets(entries, true), true
 		}
@@ -283,6 +282,7 @@ func (m *Model) handleExplorerClipboardKey(key string) (tea.Model, tea.Cmd, bool
 				m.yankPaths = []string{path}
 				m.yankMount = m.client.Mount()
 				m.yankedSecrets = nil
+				m.yankSeq++
 				m.status = "Cut (directory): " + entry.Name
 				return m, nil, true
 			}
@@ -290,7 +290,6 @@ func (m *Model) handleExplorerClipboardKey(key string) (tea.Model, tea.Cmd, bool
 			m.yankIsCut = true
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
-			m.yankMount = m.client.Mount()
 			m.status = "Cutting " + entry.Name + "..."
 			return m, m.yankSecret(path), true
 		}
@@ -432,7 +431,6 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 		if len(m.selected) > 0 {
 			entries := m.selectedEntries()
 			m.status = fmt.Sprintf("Yanking %d items...", len(entries))
-			m.yankMount = m.client.Mount()
 			m.selected = make(map[int]bool)
 			return m, m.bulkYankSecrets(entries, false), true
 		}
@@ -445,6 +443,7 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 				m.yankPaths = []string{path}
 				m.yankMount = m.client.Mount()
 				m.yankedSecrets = nil
+				m.yankSeq++
 				m.status = "Yanked (directory): " + entry.Name
 				return m, nil, true
 			}
@@ -452,7 +451,6 @@ func (m *Model) handleExplorerMiscKey(key string) (tea.Model, tea.Cmd, bool) {
 			m.yankIsCut = false
 			m.yankIsDir = false
 			m.yankPaths = []string{path}
-			m.yankMount = m.client.Mount()
 			m.status = "Yanking " + entry.Name + "..."
 			return m, m.yankSecret(path), true
 		}

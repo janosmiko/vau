@@ -2353,7 +2353,7 @@ func TestUpdate_EditorResultMsg_NilSecret(t *testing.T) {
 func TestUpdate_NewSecretEditorMsg(t *testing.T) {
 	m := newTestModel()
 	// This returns a cmd that calls openEditorForNewSecret
-	result, cmd := m.Update(newSecretEditorMsg("secret/new-path"))
+	result, cmd := m.Update(newSecretEditorMsg{path: "secret/new-path", mount: m.client.Mount()})
 	assert.Equal(t, m, result)
 	assert.NotNil(t, cmd, "should return cmd to open editor")
 }

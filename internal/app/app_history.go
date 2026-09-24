@@ -41,7 +41,7 @@ func (m *Model) handleVersionHistoryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			client := m.client
 			return m, func() tea.Msg {
 				secret, err := client.ReadVersion(path, ver)
-				return versionDetailMsg{mount: client.Mount(), version: ver, secret: secret, err: err}
+				return versionDetailMsg{mount: client.Mount(), path: path, version: ver, secret: secret, err: err}
 			}
 		}
 	case "D":

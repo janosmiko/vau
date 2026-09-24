@@ -185,7 +185,10 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case confirmCreateMsg:
-		path := string(msg)
+		if msg.mount != m.client.Mount() {
+			return m, nil, true
+		}
+		path := msg.path
 		m.confirmMsg = fmt.Sprintf("Secret %q already exists. Overwrite?", path)
 		m.prevConfirmMode = model.ModeExplorer
 		m.confirmAction = func() tea.Cmd {
@@ -195,7 +198,10 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case confirmCreateEditorMsg:
-		path := string(msg)
+		if msg.mount != m.client.Mount() {
+			return m, nil, true
+		}
+		path := msg.path
 		m.confirmMsg = fmt.Sprintf("Secret %q already exists. Overwrite?", path)
 		m.prevConfirmMode = model.ModeExplorer
 		m.confirmAction = func() tea.Cmd {
@@ -205,7 +211,8 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case versionHistoryMsg:
-		if msg.mount != m.client.Mount() {
+		// A stale history list would let "D" destroy its version number on the current path.
+		if msg.mount != m.client.Mount() || msg.path != m.versionPath {
 			return m, nil, true
 		}
 		if msg.err != nil {
@@ -218,7 +225,7 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 
 	case versionDetailMsg:
-		if msg.mount != m.client.Mount() {
+		if msg.mount != m.client.Mount() || msg.path != m.versionPath {
 			return m, nil, true
 		}
 		if msg.err != nil {
@@ -241,6 +248,11 @@ func (m *Model) updateStatusErrorMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m *Model) updateYankUndoRedoMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case yankResultMsg:
+		if msg.seq != m.yankSeq {
+			return m, nil, true
+		}
+		// Set the mount with the payload, so the paste guard never pairs one mount with another mount's data.
+		m.yankMount = msg.mount
 		m.yankedSecrets = msg.secrets
 		m.yankPaths = msg.paths
 		m.yankIsCut = msg.isCut
@@ -307,6 +319,11 @@ func (m *Model) updateYankUndoRedoMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 func (m *Model) updateSecretEditMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case newSecretInlineMsg:
+		// Inline edits save through m.client, so after a mount switch they would go to the wrong mount.
+		if msg.mount != m.client.Mount() {
+			m.status = "Created: " + msg.secret.Path
+			return m, nil, true
+		}
 		// Open the new secret in popup with inline editing ready
 		m.mode = model.ModeSecretEdit
 		m.secret = msg.secret
@@ -325,8 +342,10 @@ func (m *Model) updateSecretEditMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return m, tea.Batch(textinput.Blink, m.refresh()), true
 
 	case newSecretEditorMsg:
-		path := string(msg)
-		return m, m.openEditorForNewSecret(path), true
+		if msg.mount != m.client.Mount() {
+			return m, nil, true
+		}
+		return m, m.openEditorForNewSecret(msg.path), true
 
 	case editorResultMsg:
 		// New secret creation via editor

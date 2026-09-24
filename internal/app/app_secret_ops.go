@@ -16,18 +16,22 @@ import (
 func (m *Model) yankSecret(path string) tea.Cmd {
 	isCut := m.yankIsCut
 	client := m.client
+	m.yankSeq++
+	seq := m.yankSeq
 	return func() tea.Msg {
 		secret, err := client.Read(path)
 		if err != nil {
 			return errorMsg(fmt.Sprintf("yank failed: %v", err))
 		}
-		return yankResultMsg{secrets: []*model.Secret{secret}, paths: []string{path}, isCut: isCut}
+		return yankResultMsg{seq: seq, mount: client.Mount(), secrets: []*model.Secret{secret}, paths: []string{path}, isCut: isCut}
 	}
 }
 
 func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
 	basePath := m.currentPath()
 	client := m.client
+	m.yankSeq++
+	seq := m.yankSeq
 	return func() tea.Msg {
 		var secrets []*model.Secret
 		var paths []string
@@ -45,7 +49,7 @@ func (m *Model) bulkYankSecrets(entries []model.Entry, isCut bool) tea.Cmd {
 			}
 			secrets = append(secrets, secret)
 		}
-		return yankResultMsg{secrets: secrets, paths: paths, isCut: isCut, isDir: hasDir}
+		return yankResultMsg{seq: seq, mount: client.Mount(), secrets: secrets, paths: paths, isCut: isCut, isDir: hasDir}
 	}
 }
 
@@ -174,7 +178,7 @@ func (m *Model) createSecretWithCheck(path string) tea.Cmd {
 	return func() tea.Msg {
 		// Check if secret already exists
 		if _, err := client.Read(path); err == nil {
-			return confirmCreateMsg(path)
+			return confirmCreateMsg{path: path, mount: client.Mount()}
 		}
 		// Create an empty secret and open the popup for inline editing
 		return create()
@@ -195,7 +199,7 @@ func (m *Model) createEmptySecretAndOpen(path string) tea.Cmd {
 			Data: map[string]string{"": ""},
 			Keys: []string{""},
 		}
-		return newSecretInlineMsg{secret: secret}
+		return newSecretInlineMsg{secret: secret, mount: client.Mount()}
 	}
 }
 
@@ -205,9 +209,9 @@ func (m *Model) createSecretWithEditor(path string) tea.Cmd {
 	client := m.client
 	return func() tea.Msg {
 		if _, err := client.Read(path); err == nil {
-			return confirmCreateEditorMsg(path)
+			return confirmCreateEditorMsg{path: path, mount: client.Mount()}
 		}
-		return newSecretEditorMsg(path)
+		return newSecretEditorMsg{path: path, mount: client.Mount()}
 	}
 }
 

@@ -29,9 +29,12 @@ type (
 		mounts []string
 		err    error
 	}
-	statusMsg         string
-	errorMsg          string
-	confirmCreateMsg  string // path to create after overwrite confirmation
+	statusMsg        string
+	errorMsg         string
+	confirmCreateMsg struct { // path to create after overwrite confirmation
+		path  string
+		mount string
+	}
 	undoableStatusMsg struct {
 		status       string
 		undo         model.UndoAction
@@ -50,6 +53,7 @@ type (
 	}
 	versionDetailMsg struct {
 		mount   string
+		path    string
 		version int
 		secret  *model.Secret
 		err     error
@@ -58,12 +62,21 @@ type (
 		data          map[string]string
 		newSecretPath string // non-empty when creating a new secret via editor
 	}
-	newSecretEditorMsg     string // path for new secret to open in editor
-	confirmCreateEditorMsg string // path to create after overwrite confirmation (editor flow)
-	newSecretInlineMsg     struct {
+	newSecretEditorMsg struct { // path for new secret to open in editor
+		path  string
+		mount string
+	}
+	confirmCreateEditorMsg struct { // path to create after overwrite confirmation (editor flow)
+		path  string
+		mount string
+	}
+	newSecretInlineMsg struct {
 		secret *model.Secret
+		mount  string
 	}
 	yankResultMsg struct {
+		seq     int
+		mount   string
 		secrets []*model.Secret
 		paths   []string
 		isCut   bool
@@ -192,6 +205,7 @@ type Model struct {
 	yankMount     string          // mount path at yank time (for cross-mount detection)
 	yankIsCut     bool            // true if yanked via cut (x) — paste will delete source
 	yankIsDir     bool            // true if yanked items include directories
+	yankSeq       int             // drops yank results that finish after a newer yank
 
 	// Search (s = jump-to) and Filter (/ = hide non-matching)
 	searchInput textinput.Model
