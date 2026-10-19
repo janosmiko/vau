@@ -538,7 +538,7 @@ Contributions are welcome! Here's how to get started:
 
 ### Development Setup
 
-1. **Prerequisites**: Go 1.26+ and a running Vault instance
+1. **Prerequisites**: Go 1.27+ and a running Vault instance
 
 2. **Clone and build**:
 
