@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/janosmiko/vau/compare/v0.7.2...v0.7.3) (2026-10-19)
+
+
+### Bug Fixes
+
+* **deps:** bump go to 1.26.9 and x/net to v0.60.0 for govulncheck ([#17](https://github.com/janosmiko/vau/issues/17)) ([fc56087](https://github.com/janosmiko/vau/commit/fc5608765a5cf731d01635ce659be365273a1b80))
+
 ## [0.7.2](https://github.com/janosmiko/vau/compare/v0.7.1...v0.7.2) (2026-09-24)
 
 
