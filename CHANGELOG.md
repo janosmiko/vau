@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/janosmiko/vau/compare/v0.7.3...v0.7.4) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ci:** bump golangci-lint to v2.15.0 in release workflow ([#20](https://github.com/janosmiko/vau/issues/20)) ([115f9dd](https://github.com/janosmiko/vau/commit/115f9dd62afe431c733dac09db63f15fb92add17))
+
 ## [0.7.3](https://github.com/janosmiko/vau/compare/v0.7.2...v0.7.3) (2026-10-19)
 
 
